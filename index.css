@@ -1,0 +1,37 @@
+
+@keyframes party-shake {
+    0% { transform: translate(0, 0) rotate(0deg); }
+    25% { transform: translate(5px, 5px) rotate(2deg); }
+    50% { transform: translate(-5px, -5px) rotate(-2deg); }
+    75% { transform: translate(5px, -5px) rotate(2deg); }
+    100% { transform: translate(0, 0) rotate(0deg); }
+}
+
+.party-active {
+    animation: party-shake 0.2s infinite;
+    filter: hue-rotate(90deg) saturate(2);
+}
+
+/* Texture Packs */
+.skin-synthwave { background: #0f172a !important; color: #f472b6 !important; }
+.skin-synthwave button, .skin-synthwave .bg-gray-800 { background: #1e1b4b !important; color: #f472b6 !important; border-color: #f472b6 !important; }
+
+.skin-paper { background: #f5f5dc !important; color: #000 !important; }
+.skin-paper button, .skin-paper .bg-gray-800 { background: #e5e5d0 !important; color: #000 !important; border-color: #000 !important; }
+
+.skin-high-contrast { background: #000 !important; color: #fff !important; }
+.skin-high-contrast button, .skin-high-contrast .bg-gray-800 { background: #fff !important; color: #000 !important; border-color: #fff !important; }
+
+.skin-terminal { background: #000 !important; color: #0f0 !important; font-family: monospace !important; }
+.skin-terminal button, .skin-terminal .bg-gray-800 { background: #000 !important; color: #0f0 !important; border-color: #0f0 !important; }
+
+/* Crazy Features */
+.big-head .member-avatar { transform: scale(1.5) !important; }
+.disco { animation: disco 1s infinite alternate !important; }
+.slow-mo { animation-duration: 3s !important; }
+.gravity-shift { transform: rotate(180deg) !important; }
+
+@keyframes disco {
+    0% { filter: hue-rotate(0deg); }
+    100% { filter: hue-rotate(360deg); }
+}
