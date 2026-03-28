@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Director, DirectorOutfit, Appearance, Uniform, InstrumentType, TransformConfig, ShopItem, CustomAsset } from '../types';
+import { Director, DirectorOutfit, Appearance, Uniform, InstrumentType, TransformConfig, ShopItem, CustomAsset, BandIdentity } from '../types';
 import { Button } from './Button';
 import { COLORS, HAIR_STYLES_MALE, HAIR_STYLES_FEMALE, CLOTHING_OPTIONS, SHOP_ITEMS, FACE_OPTIONS } from '../constants';
 import { BandMemberVisual } from './BandMemberVisual';
@@ -12,9 +12,10 @@ interface AvatarEditorProps {
     unlockedItems?: string[]; 
     customShopItems?: ShopItem[];
     customAssets?: CustomAsset[];
+    bandIdentity?: BandIdentity;
 }
 
-export const AvatarEditor: React.FC<AvatarEditorProps> = ({ director, onSave, onBack, unlockedItems = [], customShopItems = [], customAssets = [] }) => {
+export const AvatarEditor: React.FC<AvatarEditorProps> = ({ director, onSave, onBack, unlockedItems = [], customShopItems = [], customAssets = [], bandIdentity }) => {
     // Local state for gender to allow toggling
     const [gender, setGender] = useState<'MALE' | 'FEMALE'>(director.gender || 'MALE');
 
@@ -36,6 +37,8 @@ export const AvatarEditor: React.FC<AvatarEditorProps> = ({ director, onSave, on
         facialHairTransform: director.appearance.facialHairTransform || { scaleX: 1, scaleY: 1, x: 0, y: 0 },
         glassesTransform: director.appearance.glassesTransform || { scaleX: 1, scaleY: 1, x: 0, y: 0 }
     });
+    const [logoGrid, setLogoGrid] = useState<string[]>(Array(100).fill('transparent'));
+    const [logoText, setLogoText] = useState<string>("");
     const [view, setView] = useState<'FRONT' | 'BACK'>('FRONT');
     const [showAdvanced, setShowAdvanced] = useState(false);
     const [transformTarget, setTransformTarget] = useState<'HAIR' | 'HAT' | 'ACCESSORY' | 'EYES' | 'BROWS' | 'FACIAL_HAIR' | 'GLASSES'>('HAIR');
@@ -112,6 +115,17 @@ export const AvatarEditor: React.FC<AvatarEditorProps> = ({ director, onSave, on
         // Crucial Fix: Ensure we are updating the outfit that matches currentOutfitId
         const newOutfits = outfits.map(o => o.id === currentOutfitId ? { ...o, ...updates } : o);
         setOutfits(newOutfits);
+    };
+
+    const updateLogoPlacement = (updates: Partial<import('../types').LogoPlacement>) => {
+        const currentPlacement = activeOutfit.logoPlacement || {
+            enabled: true,
+            logoType: 'NONE',
+            position: 'CHEST_LEFT',
+            size: 'MEDIUM',
+            applyTo: 'BOTH'
+        };
+        updateOutfit({ logoPlacement: { ...currentPlacement, ...updates } });
     };
 
     const updateTransform = (target: typeof transformTarget, field: keyof TransformConfig, value: number) => {
@@ -219,7 +233,8 @@ export const AvatarEditor: React.FC<AvatarEditorProps> = ({ director, onSave, on
             pantsStyle,
             topId: activeOutfit.topId,
             bottomId: activeOutfit.bottomId,
-            hatId: activeOutfit.hatId
+            hatId: activeOutfit.hatId,
+            logoPlacement: activeOutfit.logoPlacement
         };
     };
 
@@ -308,7 +323,42 @@ export const AvatarEditor: React.FC<AvatarEditorProps> = ({ director, onSave, on
                 
                 {/* WARDROBE SELECTOR */}
                 <div>
-                    <label className="text-gray-500 text-xs font-bold uppercase mb-2 block">CURRENT OUTFIT</label>
+                    <div className="flex justify-between items-center mb-2">
+                        <label className="text-gray-500 text-xs font-bold uppercase block">CURRENT OUTFIT</label>
+                        <Button 
+                            onClick={() => {
+                                const mainColor = COLORS[Math.floor(Math.random() * COLORS.length)].hex;
+                                const secondaryColor = COLORS[Math.floor(Math.random() * COLORS.length)].hex;
+                                const neutrals = ['#ffffff', '#000000', '#333333', '#e5e7eb', '#1f2937', '#f3f4f6'];
+                                const neutral = neutrals[Math.floor(Math.random() * neutrals.length)];
+                                
+                                setAppearance({
+                                    ...appearance,
+                                    skinColor: ['#fecaca', '#dca586', '#a16207', '#5D4037', '#3E2723', '#fcd34d'][Math.floor(Math.random() * 6)],
+                                    hairColor: ['#000000', '#3E2723', '#5D4037', '#8D6E63', '#FFC107', '#E0E0E0', '#B71C1C'][Math.floor(Math.random() * 7)],
+                                    hairStyle: AVAILABLE_HAIR_STYLES[Math.floor(Math.random() * AVAILABLE_HAIR_STYLES.length)].id,
+                                    bodyType: ['slim', 'average', 'heavy'][Math.floor(Math.random() * 3)] as any,
+                                    height: 0.9 + Math.random() * 0.2,
+                                    eyeId: FACE_OPTIONS.EYES[Math.floor(Math.random() * FACE_OPTIONS.EYES.length)].id,
+                                    eyebrowId: FACE_OPTIONS.BROWS[Math.floor(Math.random() * FACE_OPTIONS.BROWS.length)].id,
+                                    mouthId: FACE_OPTIONS.MOUTHS[Math.floor(Math.random() * FACE_OPTIONS.MOUTHS.length)].id,
+                                    facialHairId: FACE_OPTIONS.FACIAL_HAIR[Math.floor(Math.random() * FACE_OPTIONS.FACIAL_HAIR.length)].id,
+                                    glassesId: FACE_OPTIONS.GLASSES[Math.floor(Math.random() * FACE_OPTIONS.GLASSES.length)].id
+                                });
+                                updateOutfit({
+                                    topId: EXTENDED_CLOTHING.TOPS[Math.floor(Math.random() * EXTENDED_CLOTHING.TOPS.length)].id,
+                                    bottomId: EXTENDED_CLOTHING.BOTTOMS[Math.floor(Math.random() * EXTENDED_CLOTHING.BOTTOMS.length)].id,
+                                    hatId: Math.random() > 0.5 ? EXTENDED_CLOTHING.HATS[Math.floor(Math.random() * EXTENDED_CLOTHING.HATS.length)].id : undefined,
+                                    topColor: mainColor,
+                                    bottomColor: neutral,
+                                    secondaryColor: secondaryColor
+                                });
+                            }}
+                            className="bg-purple-600 hover:bg-purple-500 border-purple-400 text-[10px] py-1 px-2"
+                        >
+                            🎲 RANDOMIZE LOOK
+                        </Button>
+                    </div>
                     <div className="flex gap-2 mb-2">
                         <select 
                             className="flex-grow bg-gray-800 border-2 border-gray-600 p-2 text-sm font-bold uppercase text-white outline-none focus:border-yellow-500"
@@ -576,6 +626,195 @@ export const AvatarEditor: React.FC<AvatarEditorProps> = ({ director, onSave, on
                     </div>
                 </div>
 
+                {/* LOGO & TEXT */}
+                <div className="bg-gray-900/50 p-4 border border-gray-700 rounded">
+                    <h3 className="text-yellow-400 font-bold text-sm uppercase mb-4 tracking-wider border-b border-yellow-900 pb-1">LOGO & TEXT</h3>
+                    <div className="space-y-4">
+                        <div>
+                            <label className="text-[10px] text-gray-400 font-bold uppercase mb-2 block">LOGO TYPE</label>
+                            <div className="flex gap-2">
+                                {['NONE', 'SCHOOL', 'BAND', 'CUSTOM'].map(type => (
+                                    <button 
+                                        key={type}
+                                        onClick={() => updateLogoPlacement({ logoType: type as any })}
+                                        className={`flex-1 py-1 text-[10px] font-bold border ${activeOutfit.logoPlacement?.logoType === type ? 'bg-yellow-600 text-white border-white' : 'bg-gray-800 text-gray-500 border-gray-600'}`}
+                                    >
+                                        {type}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {activeOutfit.logoPlacement?.logoType === 'CUSTOM' && (
+                            <>
+                                <div>
+                                    <label className="text-[10px] text-gray-400 font-bold uppercase mb-2 block">CUSTOM TEXT</label>
+                                    <input 
+                                        value={logoText}
+                                        onChange={(e) => setLogoText(e.target.value.substring(0, 10))}
+                                        className="w-full bg-gray-800 border text-white p-2 text-sm uppercase"
+                                        placeholder="e.g. BAND"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] text-gray-400 font-bold uppercase mb-2 block">CUSTOM COLOR</label>
+                                    <div className="flex gap-2 flex-wrap">
+                                        {COLORS.map(c => (
+                                            <button 
+                                                key={c.name} 
+                                                className={`w-6 h-6 rounded-full border-2 transition-all ${logoGrid[0] === c.hex ? 'border-white scale-125' : 'border-transparent'}`}
+                                                style={{ backgroundColor: c.hex }}
+                                                onClick={() => setLogoGrid(Array(100).fill(c.hex))}
+                                            />
+                                        ))}
+                                    </div>
+                                </div>
+                            </>
+                        )}
+
+                        {activeOutfit.logoPlacement?.logoType !== 'NONE' && (
+                            <>
+                                <div>
+                                    <label className="text-[10px] text-gray-400 font-bold uppercase mb-2 block">POSITION</label>
+                                    <div className="flex gap-2">
+                                        {['CHEST_LEFT', 'CHEST_CENTER', 'BACK', 'HAT'].map(pos => (
+                                            <button 
+                                                key={pos}
+                                                onClick={() => updateLogoPlacement({ position: pos as any })}
+                                                className={`flex-1 py-1 text-[10px] font-bold border ${activeOutfit.logoPlacement?.position === pos ? 'bg-blue-600 text-white border-white' : 'bg-gray-800 text-gray-500 border-gray-600'}`}
+                                            >
+                                                {pos.replace('_', ' ')}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="text-[10px] text-gray-400 font-bold uppercase mb-2 block">APPLY TO</label>
+                                    <div className="flex gap-2">
+                                        {['UNIFORM', 'CASUAL', 'BOTH'].map(applyTo => (
+                                            <button 
+                                                key={applyTo}
+                                                onClick={() => updateLogoPlacement({ applyTo: applyTo as any })}
+                                                className={`flex-1 py-1 text-[10px] font-bold border ${activeOutfit.logoPlacement?.applyTo === applyTo ? 'bg-blue-600 text-white border-white' : 'bg-gray-800 text-gray-500 border-gray-600'}`}
+                                            >
+                                                {applyTo}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="text-[10px] text-gray-400 font-bold uppercase mb-2 block">SIZE</label>
+                                    <div className="flex gap-2">
+                                        {['SMALL', 'MEDIUM', 'LARGE'].map(size => (
+                                            <button 
+                                                key={size}
+                                                onClick={() => updateLogoPlacement({ size: size as any })}
+                                                className={`flex-1 py-1 text-[10px] font-bold border ${activeOutfit.logoPlacement?.size === size ? 'bg-blue-600 text-white border-white' : 'bg-gray-800 text-gray-500 border-gray-600'}`}
+                                            >
+                                                {size}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="text-[10px] text-gray-400 font-bold uppercase mb-2 block">ADDITIONAL TEXT</label>
+                                    <input 
+                                        value={activeOutfit.logoPlacement?.customText || ''}
+                                        onChange={(e) => updateLogoPlacement({ customText: e.target.value })}
+                                        className="w-full bg-gray-800 border text-white p-2 text-sm uppercase"
+                                        placeholder="e.g. DIRECTOR"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] text-gray-400 font-bold uppercase mb-2 block">TEXT FONT</label>
+                                    <select 
+                                        value={activeOutfit.logoPlacement?.font || 'font-sans'}
+                                        onChange={(e) => updateLogoPlacement({ font: e.target.value })}
+                                        className="w-full bg-gray-800 border text-white p-2 text-sm uppercase"
+                                    >
+                                        <option value="font-sans">Sans Serif</option>
+                                        <option value="font-serif">Serif</option>
+                                        <option value="font-mono">Monospace</option>
+                                        <option value="font-pixel">Pixel</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="text-[10px] text-gray-400 font-bold uppercase mb-2 block">TEXT COLOR</label>
+                                    <div className="flex flex-wrap gap-1">
+                                        {COLORS.map(c => (
+                                            <button 
+                                                key={c.name} 
+                                                onClick={() => updateLogoPlacement({ fontColor: c.hex })} 
+                                                className={`w-4 h-4 border ${activeOutfit.logoPlacement?.fontColor === c.hex ? 'border-white scale-125' : 'border-transparent'}`} 
+                                                style={{ backgroundColor: c.hex }} 
+                                            />
+                                        ))}
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="text-[10px] text-gray-400 font-bold uppercase mb-2 block">LOGO X OFFSET</label>
+                                    <input 
+                                        type="range" min="-50" max="50" step="1"
+                                        value={activeOutfit.logoPlacement?.logoXOffset || 0}
+                                        onChange={(e) => updateLogoPlacement({ logoXOffset: parseInt(e.target.value) })}
+                                        className="w-full h-1 bg-gray-700 appearance-none cursor-pointer"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] text-gray-400 font-bold uppercase mb-2 block">LOGO Y OFFSET</label>
+                                    <input 
+                                        type="range" min="-50" max="50" step="1"
+                                        value={activeOutfit.logoPlacement?.logoYOffset || 0}
+                                        onChange={(e) => updateLogoPlacement({ logoYOffset: parseInt(e.target.value) })}
+                                        className="w-full h-1 bg-gray-700 appearance-none cursor-pointer"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] text-gray-400 font-bold uppercase mb-2 block">TEXT X OFFSET</label>
+                                    <input 
+                                        type="range" min="-50" max="50" step="1"
+                                        value={activeOutfit.logoPlacement?.textXOffset || 0}
+                                        onChange={(e) => updateLogoPlacement({ textXOffset: parseInt(e.target.value) })}
+                                        className="w-full h-1 bg-gray-700 appearance-none cursor-pointer"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] text-gray-400 font-bold uppercase mb-2 block">TEXT Y OFFSET</label>
+                                    <input 
+                                        type="range" min="-50" max="50" step="1"
+                                        value={activeOutfit.logoPlacement?.textYOffset || 0}
+                                        onChange={(e) => updateLogoPlacement({ textYOffset: parseInt(e.target.value) })}
+                                        className="w-full h-1 bg-gray-700 appearance-none cursor-pointer"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] text-gray-400 font-bold uppercase mb-2 block">TEXT SCALE</label>
+                                    <input 
+                                        type="range" min="0.5" max="2" step="0.1"
+                                        value={activeOutfit.logoPlacement?.textScale || 1}
+                                        onChange={(e) => updateLogoPlacement({ textScale: parseFloat(e.target.value) })}
+                                        className="w-full h-1 bg-gray-700 appearance-none cursor-pointer"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] text-gray-400 font-bold uppercase mb-2 block">TEXT ORIENTATION</label>
+                                    <div className="flex gap-2">
+                                        {['HORIZONTAL', 'VERTICAL', 'DIAGONAL'].map(ori => (
+                                            <button 
+                                                key={ori}
+                                                onClick={() => updateLogoPlacement({ textOrientation: ori as any })}
+                                                className={`flex-1 py-1 text-[10px] font-bold border ${activeOutfit.logoPlacement?.textOrientation === ori ? 'bg-blue-600 text-white border-white' : 'bg-gray-800 text-gray-500 border-gray-600'}`}
+                                            >
+                                                {ori.substring(0, 3)}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            </>
+                        )}
+                    </div>
+                </div>
+
                 {/* ADVANCED TRANSFORMS */}
                 <div className="bg-gray-900/50 p-4 border border-gray-700 rounded">
                     <div className="flex justify-between items-center border-b border-purple-900 pb-1 mb-4">
@@ -684,6 +923,9 @@ export const AvatarEditor: React.FC<AvatarEditorProps> = ({ director, onSave, on
                             showHat={true}
                             view={view}
                             noBounce={true}
+                            bandIdentity={bandIdentity}
+                            logoGrid={logoGrid}
+                            logoText={logoText}
                         />
                     </div>
                 </div>

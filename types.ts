@@ -35,7 +35,8 @@ export enum GamePhase {
   VIDEO_APP = 'VIDEO_APP',
   MOMENTS = 'MOMENTS',
   CREDITS = 'CREDITS',
-  BUS_RIDE = 'BUS_RIDE'
+  BUS_RIDE = 'BUS_RIDE',
+  COMMUNITY_HUB = 'COMMUNITY_HUB'
 }
 
 export type GameMode = 'DIRECTOR' | 'CAREER';
@@ -120,11 +121,13 @@ export interface DirectorOutfit {
     bottomId?: string;
     hatId?: string;
     accentColor?: string; 
+    logoPlacement?: LogoPlacement;
 }
 
 export interface LogoPlacement {
     enabled: boolean;
-    position: 'CHEST_LEFT' | 'CHEST_CENTER' | 'BACK' | 'HAT';
+    logoType?: 'SCHOOL' | 'BAND' | 'CUSTOM' | 'NONE';
+    position: 'CHEST_LEFT' | 'CHEST_CENTER' | 'BACK' | 'HAT' | 'CAPE' | 'CHESTPLATE';
     size: 'SMALL' | 'MEDIUM' | 'LARGE';
     applyTo: 'UNIFORM' | 'CASUAL' | 'BOTH';
     customText?: string;
@@ -135,6 +138,8 @@ export interface LogoPlacement {
     yOffset?: number;
     logoXOffset?: number;
     logoYOffset?: number;
+    logoXScale?: number;
+    logoYScale?: number;
     textXOffset?: number;
     textYOffset?: number;
     textScale?: number;
@@ -221,6 +226,8 @@ export interface BandIdentity {
   secondaryColor: string;
   schoolLogo?: string[];
   bandLogo?: string[];
+  schoolLogoText?: string;
+  bandLogoText?: string;
   useSchoolLogo: boolean;
 }
 
@@ -471,6 +478,20 @@ export interface Transaction {
     description: string;
 }
 
+export interface InboxMessage {
+    id: string;
+    sender: string;
+    subject: string;
+    body: string;
+    timestamp: number;
+    read: boolean;
+    gift?: {
+        type: 'FUNDS' | 'REPUTATION' | 'FANS';
+        amount: number;
+    };
+    claimed?: boolean;
+}
+
 export interface Message {
     id: string;
     contactId: string;
@@ -550,6 +571,14 @@ export interface Skin {
     assetUrl: string;
 }
 
+export interface StaffMember {
+    id: string;
+    name: string;
+    role: 'Assistant Director' | 'Equipment Manager' | 'Music Arranger' | 'Recruiter' | 'Percussion Instructor' | 'Guard Instructor' | 'Visual Tech' | 'Brass Caption Head';
+    salary: number;
+    skill: number;
+}
+
 export interface GameState {
   mode: GameMode; 
   funds: number;
@@ -559,8 +588,10 @@ export interface GameState {
   bandName: string;
   style: BandStyle;
   members: BandMember[];
+  staff: StaffMember[];
   recruitPool: BandMember[]; 
   career?: CareerState;
+
   drills: Drill[];
   activeDrillId: string;
   schedule: ScheduleEvent[];
@@ -571,12 +602,16 @@ export interface GameState {
   musicLibrary: MusicTrack[];
   mediaFeed: MediaPost[];
   moments: Moment[];
+  officeLayout?: number;
   messages: Message[]; 
+  inbox: InboxMessage[];
+  lastDailyReward?: number;
   tutorialStep: number;
   director: Director;
   identity: BandIdentity;
   rivalIdentity?: BandIdentity; // NEW: Specific Rival
   rivalDirector?: string; // NEW: Name of rival director
+  rivalMembers?: BandMember[]; // NEW: Specific Rival Members
   uniforms: Uniform[];
   currentUniformId: string;
   dmUniformId?: string; 
@@ -596,6 +631,7 @@ export interface GameState {
   lastSaveDate?: string;
   alumniDonations?: number;
   uploadedVideos: VideoContent[];
+  clips: number; // NEW: Clips for video posting
   shownNotifications: string[]; // Track triggered popups
   activeBet?: { amount: number; type: 'FUNDS' | 'FANS'; eventId: string };
   trophies: string[]; // IDs of unlocked trophies
@@ -622,7 +658,9 @@ export interface RhythmNote {
   lane: number; 
   timestamp: number; 
   hit: boolean;
-  type: 'TAP' | 'HOLD';
+  type: 'TAP' | 'HOLD' | 'SWIPE';
+  duration?: number; // For HOLD notes
+  swipeDirection?: 'UP' | 'DOWN' | 'LEFT' | 'RIGHT'; // For SWIPE notes
 }
 
 export enum NoteResult {
@@ -639,7 +677,7 @@ export type CameraView = 'WIDE' | 'BAND' | 'FIELD' | 'DIRECTOR';
 export interface CutsceneData {
     id: string;
     text: string;
-    type: 'CLASS' | 'PRACTICE' | 'DINNER' | 'NAP' | 'START_HS' | 'START_COL' | 'HANGOUT' | 'PARTY' | 'WORK_BURGER' | 'WORK_BARISTA' | 'WORK_TUTOR' | 'CLUB';
+    type: 'CLASS' | 'PRACTICE' | 'DINNER' | 'NAP' | 'START_HS' | 'START_COL' | 'HANGOUT' | 'PARTY' | 'WORK_BURGER' | 'WORK_BARISTA' | 'WORK_TUTOR' | 'CLUB' | 'STAFF_MEETING' | 'PAPERWORK' | 'RECORD_CLIP';
     duration: number;
     locationName?: string;
 }

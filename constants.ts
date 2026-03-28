@@ -1,5 +1,5 @@
 
-import { BandMember, InstrumentType, BandStyle, DirectorTrait, Uniform, DirectorOutfit, Appearance, Settings, ScheduleEvent, EventType, Drill, Quest, Achievement, MusicTrack, MediaPost, Moment, School, PhoneSettings, ShopItem, InstrumentDesign, SequencerTrack, MaceDesign, Job, Advisor, CampusLocation, BandIdentity, BattleMove } from './types';
+import { BandMember, InstrumentType, BandStyle, DirectorTrait, Uniform, DirectorOutfit, Appearance, Settings, ScheduleEvent, EventType, Drill, Quest, Achievement, MusicTrack, MediaPost, Moment, School, PhoneSettings, ShopItem, InstrumentDesign, SequencerTrack, MaceDesign, Job, Advisor, CampusLocation, BandIdentity, BattleMove, StaffMember } from './types';
 
 // Names
 export const RECRUIT_NAMES = ["Marcus", "Andre", "Tasha", "Xavier", "Isabella", "Dante", "Jasmine", "Malik", "Elena", "Julian", "Fatima", "Quincy", "Nia", "Soren", "Yuki", "Leo", "Maya", "Silas", "Tara", "DeAndre", "Keisha", "Tyrone", "Aaliyah", "Jamal", "Shanice", "Terrell", "Ebony", "Kobe", "Jalen", "Imani"];
@@ -129,7 +129,8 @@ export const COLORS = [
   { name: 'Red', hex: '#ef4444' }, { name: 'Blue', hex: '#3b82f6' }, { name: 'Green', hex: '#22c55e' },
   { name: 'Yellow', hex: '#eab308' }, { name: 'Purple', hex: '#a855f7' }, { name: 'Black', hex: '#09090b' },
   { name: 'White', hex: '#ffffff' }, { name: 'Gold', hex: '#fbbf24' }, { name: 'Orange', hex: '#f97316' },
-  { name: 'Maroon', hex: '#800000' }, { name: 'Navy', hex: '#000080' }, { name: 'Teal', hex: '#008080' }
+  { name: 'Maroon', hex: '#800000' }, { name: 'Navy', hex: '#000080' }, { name: 'Teal', hex: '#008080' },
+  { name: 'Grey', hex: '#9ca3af' }
 ];
 
 // Face Options
@@ -239,11 +240,11 @@ export const generateRandomSchedule = (level: 'HS' | 'COLLEGE'): ScheduleEvent[]
 };
 
 // Designs
-export const DEFAULT_MACE_DESIGN: MaceDesign = { id: 'dm_mace_default', headShape: 'GLOBE', headColor: '#fbbf24', shaftColor: '#451a03', cordPrimary: '#fbbf24', cordSecondary: '#ef4444', ferruleColor: '#fbbf24', finish: 'SHINY' };
+export const DEFAULT_MACE_DESIGN: MaceDesign = { id: 'dm_mace_default', headShape: 'GLOBE', headColor: '#ffffff', shaftColor: '#ef4444', cordPrimary: '#ffffff', cordSecondary: '#ef4444', ferruleColor: '#ffffff', finish: 'SHINY' };
 export const DEFAULT_INSTRUMENT_DESIGNS = {
     brass: { id: 'def_brass', type: 'BRASS', primaryColor: '#fbbf24', secondaryColor: '#ffffff', finish: 'SHINY' } as InstrumentDesign,
     woodwind: { id: 'def_ww', type: 'WOODWIND', primaryColor: '#000000', secondaryColor: '#c0c0c0', finish: 'MATTE' } as InstrumentDesign,
-    percussion: { id: 'def_perc', type: 'PERCUSSION', primaryColor: '#ffffff', secondaryColor: '#c0c0c0', detailColor: '#ffffff', finish: 'SHINY' } as InstrumentDesign,
+    percussion: { id: 'def_perc', type: 'PERCUSSION', primaryColor: '#ffffff', secondaryColor: '#ef4444', detailColor: '#ffffff', finish: 'SHINY' } as InstrumentDesign,
     mace: DEFAULT_MACE_DESIGN
 };
 
@@ -359,6 +360,18 @@ export const OG_MEMBERS: BandMember[] = [ { id: 'og_dave', name: 'Drum Major Dav
 
 export const MOCK_RECRUITS: BandMember[] = [ { id: 'r1', name: 'Marcus Williams', instrument: InstrumentType.SNARE, marchSkill: 75, playSkill: 80, showmanship: 60, salary: 500, appearance: getRandomAppearance(), archetype: 'Grinder', bio: 'Former competitive sectional leader.', directorNote: "Very reliable.", chemistry: 75 } ];
 
+export const MOCK_STAFF: StaffMember[] = [
+    { id: 'staff-1', name: 'Sarah Jenkins', role: 'Assistant Director', salary: 2000, skill: 85 },
+    { id: 'staff-2', name: 'Mike Ross', role: 'Equipment Manager', salary: 1000, skill: 70 },
+    { id: 'staff-3', name: 'Emily Chen', role: 'Music Arranger', salary: 2500, skill: 90 },
+    { id: 'staff-4', name: 'David Lee', role: 'Recruiter', salary: 1500, skill: 75 },
+    { id: 'staff-5', name: 'Marcus Johnson', role: 'Percussion Instructor', salary: 1800, skill: 88 },
+    { id: 'staff-6', name: 'Chloe Martinez', role: 'Guard Instructor', salary: 1800, skill: 85 },
+    { id: 'staff-7', name: 'James Wilson', role: 'Visual Tech', salary: 1600, skill: 80 },
+    { id: 'staff-8', name: 'Robert Taylor', role: 'Brass Caption Head', salary: 2200, skill: 89 }
+];
+
+
 export const generateBalancedRoster = (count: number): BandMember[] => {
     const roster: BandMember[] = [];
     const instruments = Object.values(InstrumentType).filter(i => i !== InstrumentType.MACE);
@@ -455,7 +468,7 @@ export const SCHOOL_PRESETS = [
     { name: 'Prairie Valley', mascot: 'Panthers', primary: '#a855f7', secondary: '#fbbf24', band: 'The Storm', type: 'College' as const, logo: generateProceduralLogo('#a855f7', '#fbbf24', 'PV') }, 
     { name: 'Tennessee A&I', mascot: 'Tigers', primary: '#3b82f6', secondary: '#ffffff', band: 'Aristocrat of Bands', type: 'College' as const, logo: generateProceduralLogo('#3b82f6', '#ffffff', 'TN') } 
 ];
-export const generateOpponentIdentity = (name: string): { identity: BandIdentity, uniform: Uniform } => { let hash = 0; for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash); const colorIndex1 = Math.abs(hash) % COLORS.length; const colorIndex2 = Math.abs(hash >> 3) % COLORS.length; const primary = COLORS[colorIndex1].hex; const secondary = COLORS[colorIndex2 === colorIndex1 ? (colorIndex1 + 1) % COLORS.length : colorIndex2].hex; const hatStyles = ['shako', 'stetson', 'beret', 'cap']; const hatStyle = hatStyles[Math.abs(hash) % hatStyles.length] as any; const mascot = MASCOTS[Math.abs(hash) % MASCOTS.length]; return { identity: { schoolName: name, schoolType: 'High School', mascot: mascot, primaryColor: primary, secondaryColor: secondary, logo: Array(100).fill(null).map((_, i) => (i % 2 === 0 ? primary : secondary)) }, uniform: { id: `opp_${name}`, name: name, jacketColor: primary, pantsColor: Math.abs(hash) % 2 === 0 ? '#ffffff' : '#000000', hatColor: primary, plumeColor: secondary, accentColor: secondary, hatStyle: hatStyle, jacketStyle: 'classic', pantsStyle: 'regular', isDrumMajor: false } }; };
+export const generateOpponentIdentity = (name: string): { identity: BandIdentity, uniform: Uniform } => { let hash = 0; for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash); const colorIndex1 = Math.abs(hash) % COLORS.length; const colorIndex2 = Math.abs(hash >> 3) % COLORS.length; const primary = COLORS[colorIndex1].hex; const secondary = COLORS[colorIndex2 === colorIndex1 ? (colorIndex1 + 1) % COLORS.length : colorIndex2].hex; const hatStyles = ['shako', 'stetson', 'beret', 'cap']; const hatStyle = hatStyles[Math.abs(hash) % hatStyles.length] as any; const mascot = MASCOTS[Math.abs(hash) % MASCOTS.length]; return { identity: { schoolName: name, schoolType: 'High School', mascot: mascot, primaryColor: primary, secondaryColor: secondary, useSchoolLogo: true, schoolLogo: Array(100).fill(null).map((_, i) => (i % 2 === 0 ? primary : secondary)) }, uniform: { id: `opp_${name}`, name: name, jacketColor: primary, pantsColor: Math.abs(hash) % 2 === 0 ? '#ffffff' : '#000000', hatColor: primary, plumeColor: secondary, accentColor: secondary, hatStyle: hatStyle, jacketStyle: 'classic', pantsStyle: 'regular', isDrumMajor: false } }; };
 export const VIDEO_TITLES = [ "INSANE DRUMLINE BATTLE VS {rivalName}", "{bandName} FULL SHOW 2024 (HIGH CAM)", "TRUMPET SCREAMER COMPILATION", "Band Director Reacts to {bandName}", "Day in the Life: Marching Band", "Why {bandName} is UNDEFEATED" ];
 export const CREDITS_DATA = [ { role: "Lead Developer", name: "You" }, { role: "Art Direction", name: "CSS & Tailwind" }, { role: "Music Engine", name: "Web Audio API" }, { role: "Special Thanks", name: "React Community" } ];
 export const RIVAL_CHANTS = [ "HEY {bandName}! PACK IT UP!", "{mascot} AIN'T LOUD! WE LOUD!", "GET BACK ON THE BUS!", "WE READY! Y'ALL AIN'T READY!", "CAN'T HEAR YOU! TOO QUIET!", "WHO RUN THE YARD? WE RUN THE YARD!", "YOUR HORN LINE IS WEAK! PURE TRASH!", "DON'T START NOTHIN', WON'T BE NOTHIN'!", "WE THE REAL {mascot}! Y'ALL IMPOSTORS!" ];

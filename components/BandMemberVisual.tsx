@@ -1,7 +1,7 @@
 
 import React, { useMemo } from 'react';
 import { motion } from 'motion/react';
-import { InstrumentType, Uniform, Appearance, InstrumentDesign, MaceDesign, CustomAsset } from '../types';
+import { InstrumentType, Uniform, Appearance, InstrumentDesign, MaceDesign, CustomAsset, BandIdentity } from '../types';
 
 interface BandMemberVisualProps {
     instrument: InstrumentType;
@@ -14,10 +14,12 @@ interface BandMemberVisualProps {
     instrumentConfig?: InstrumentDesign;
     maceConfig?: MaceDesign;
     logoGrid?: string[];
+    logoText?: string;
     view?: 'FRONT' | 'BACK'; 
     noBounce?: boolean;
     isCranking?: boolean;
     customAssets?: CustomAsset[];
+    bandIdentity?: BandIdentity;
 }
 
 export const BandMemberVisual: React.FC<BandMemberVisualProps> = ({ 
@@ -31,10 +33,12 @@ export const BandMemberVisual: React.FC<BandMemberVisualProps> = ({
     instrumentConfig,
     maceConfig,
     logoGrid,
+    logoText,
     view = 'FRONT',
     noBounce = false,
     isCranking = false,
-    customAssets: propCustomAssets
+    customAssets: propCustomAssets,
+    bandIdentity
 }) => {
     const animDelay = useMemo(() => Math.random() * -2 + 's', []);
 
@@ -80,6 +84,16 @@ export const BandMemberVisual: React.FC<BandMemberVisualProps> = ({
         } catch (e) {}
         return [];
     }, [propCustomAssets, appearance.hairStyle, uniform.hatStyle, uniform.jacketStyle, uniform.pantsStyle, appearance.accessoryId]);
+
+    const getAcronym = (name: string) => {
+        const words = name.split(' ').filter(w => w.length > 0);
+        if (words.length === 1) return words[0].substring(0, 3).toUpperCase();
+        return words.map(w => w[0]).join('').toUpperCase().substring(0, 4);
+    };
+
+    const schoolAcronym = bandIdentity ? getAcronym(bandIdentity.schoolName) : 'PRIDE';
+    const prideText = bandIdentity?.mascot ? bandIdentity.mascot.toUpperCase() : schoolAcronym;
+    const prideYear = bandIdentity?.foundingYear || '';
 
     const getFinishStyle = (finish: string, color: string) => {
         if (finish === 'MATTE') return { backgroundColor: color };
@@ -308,6 +322,19 @@ export const BandMemberVisual: React.FC<BandMemberVisualProps> = ({
         return null;
     };
 
+    const resolveLogo = () => {
+        if (!uniform.logoPlacement) return { grid: logoGrid, text: logoText };
+        switch (uniform.logoPlacement.logoType) {
+            case 'SCHOOL': return { grid: bandIdentity?.schoolLogo, text: bandIdentity?.schoolLogoText };
+            case 'BAND': return { grid: bandIdentity?.bandLogo, text: bandIdentity?.bandLogoText };
+            case 'CUSTOM': return { grid: logoGrid, text: logoText };
+            case 'NONE': return { grid: undefined, text: undefined };
+            default: return { grid: logoGrid, text: logoText };
+        }
+    };
+
+    const { grid: activeLogoGrid, text: activeLogoText } = resolveLogo();
+
     const renderHat = () => {
         // ... (existing hat logic)
         if (!showHat || hatStyle === 'none') return null;
@@ -372,9 +399,9 @@ export const BandMemberVisual: React.FC<BandMemberVisualProps> = ({
                 hatOffset = "-top-3";
                 hatContent = (
                     <div className="relative">
-                        <div className="w-12 h-6 rounded-t-lg border-2 border-black/40 flex items-center justify-center" style={{ backgroundColor: uniform.hatColor }}>
-                            <div className="text-[6px] font-black text-white drop-shadow-md uppercase tracking-widest" style={{ color: secondaryColor }}>
-                                PRIDE
+                        <div className="w-12 h-6 rounded-t-lg border-2 border-black/40 flex items-center justify-center overflow-hidden" style={{ backgroundColor: uniform.hatColor }}>
+                            <div className="text-[5px] font-black text-white drop-shadow-md uppercase tracking-widest truncate px-1" style={{ color: secondaryColor }}>
+                                {schoolAcronym}
                             </div>
                         </div>
                         {view === 'FRONT' && <div className="w-10 h-2 bg-black/30 absolute bottom-0 -right-2 transform rotate-12"></div>}
@@ -494,13 +521,6 @@ export const BandMemberVisual: React.FC<BandMemberVisualProps> = ({
                         }}
                     >
                         <div className="w-full h-full bg-gradient-to-b from-black/10 to-transparent"></div>
-                        {view === 'BACK' && uniform.logoPlacement?.enabled && logoGrid && (
-                            <div className="absolute top-12 left-1/2 -translate-x-1/2 scale-75 opacity-80">
-                                 <div className="grid grid-cols-10 gap-0" style={{ width: '40px', height: '40px' }}>
-                                    {logoGrid.map((c, i) => <div key={i} style={{ backgroundColor: c }}></div>)}
-                                 </div>
-                            </div>
-                        )}
                     </div>
                 )}
                 {capeType === 'side' && (
@@ -514,6 +534,38 @@ export const BandMemberVisual: React.FC<BandMemberVisualProps> = ({
                     >
                         <div className="w-full h-full bg-gradient-to-b from-black/10 to-transparent"></div>
                     </div>
+                )}
+                {view === 'BACK' && uniform.logoPlacement?.enabled && (uniform.logoPlacement.position === 'BACK' || uniform.logoPlacement.position === 'CAPE') && activeLogoGrid && (
+                    <div className="absolute top-4 left-1/2 opacity-80 z-30 pointer-events-none"
+                         style={{ 
+                             transform: `translate(calc(-50% + ${uniform.logoPlacement.logoXOffset || 0}px), ${uniform.logoPlacement.logoYOffset || 0}px) scale(${uniform.logoPlacement.logoXScale || 1}, ${uniform.logoPlacement.logoYScale || 1})`
+                         }}
+                    >
+                         <div className="grid gap-0" style={{ gridTemplateColumns: `repeat(${Math.sqrt(activeLogoGrid.length)}, 1fr)`, width: '40px', height: '40px' }}>
+                            {activeLogoGrid.map((c, i) => <div key={i} style={{ backgroundColor: c }}></div>)}
+                         </div>
+                         {activeLogoText && (
+                             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                 <span className="font-black text-white drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)]" style={{ fontSize: '16px', WebkitTextStroke: '1px black' }}>
+                                     {activeLogoText}
+                                 </span>
+                             </div>
+                         )}
+                    </div>
+                )}
+                {view === 'BACK' && uniform.logoPlacement?.customText && (uniform.logoPlacement.position === 'BACK' || uniform.logoPlacement.position === 'CAPE') && (
+                     <div 
+                        className="absolute top-20 left-1/2 text-center text-[6px] font-black uppercase text-white/90 px-1 z-40 pointer-events-none"
+                        style={{ 
+                            fontFamily: uniform.logoPlacement.font || 'inherit',
+                            writingMode: uniform.logoPlacement.textOrientation === 'VERTICAL' ? 'vertical-rl' : 'horizontal-tb',
+                            textOrientation: uniform.logoPlacement.textOrientation === 'VERTICAL' ? 'upright' : 'mixed',
+                            transform: `translate(calc(-50% + ${uniform.logoPlacement.textXOffset || 0}px), ${uniform.logoPlacement.textYOffset || 0}px) scale(${uniform.logoPlacement.textScale || 1}) ${uniform.logoPlacement.textOrientation === 'DIAGONAL' ? 'rotate(-45deg)' : ''}`,
+                            color: uniform.logoPlacement.fontColor || '#ffffff'
+                        }}
+                     >
+                         {uniform.logoPlacement.customText}
+                     </div>
                 )}
             </div>
         );
@@ -536,6 +588,35 @@ export const BandMemberVisual: React.FC<BandMemberVisualProps> = ({
             );
         }
 
+        if (instrument === InstrumentType.MAJORETTE) {
+            return (
+                <div className="relative z-30" style={{ 
+                    width: torsoWidth,
+                    transform: `translate(${jacketTransform.x || 0}px, ${jacketTransform.y || 0}px) scale(${jacketTransform.scaleX || 1}, ${jacketTransform.scaleY || 1})`,
+                    transformOrigin: 'top center'
+                }}>
+                    {/* Leotard Body */}
+                    <div className="h-[120%] relative overflow-hidden border-2 border-black/40 shadow-[4px_4px_0_rgba(0,0,0,0.3)] rounded-b-3xl"
+                         style={{ backgroundColor: jacketColor }}>
+                        {/* Sparkle effect */}
+                        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0IiBoZWlnaHQ9IjQiPjxyZWN0IHdpZHRoPSI0IiBoZWlnaHQ9IjQiIGZpbGw9InRyYW5zcGFyZW50Ii8+PGNpcmNsZSBjeD0iMiIgY3k9IjIiIHI9IjEiIGZpbGw9InJnYmEoMjU1LDI1NSwyNTUsMC44KSIvPjwvc3ZnPg==')] opacity-90 animate-pulse mix-blend-overlay"></div>
+                        <div className="absolute inset-0 bg-gradient-to-tr from-white/30 via-transparent to-white/50 pointer-events-none"></div>
+                        <div className="absolute top-0 w-full h-full border-x-4 border-transparent" style={{ borderColor: `transparent ${secondaryColor} transparent transparent` }}></div>
+                        {/* Sequin pattern */}
+                        <div className="absolute inset-0 opacity-60" style={{ backgroundImage: `radial-gradient(${secondaryColor} 1.5px, transparent 1.5px)`, backgroundSize: '5px 5px' }}></div>
+                        {/* Center design */}
+                        <div className="absolute top-2 bottom-4 left-1/2 -translate-x-1/2 w-4 bg-white/30 rounded-full blur-[1px]"></div>
+                    </div>
+                    {/* Fringe / Skirt */}
+                    <div className="absolute -bottom-4 left-[-10%] w-[120%] h-6 flex justify-around items-start overflow-hidden z-[-1]">
+                        {[...Array(10)].map((_, i) => (
+                            <div key={i} className="w-1.5 h-full bg-gradient-to-b from-white to-transparent rounded-b-full opacity-80" style={{ backgroundColor: secondaryColor, transform: `rotate(${(i - 4.5) * 5}deg)` }}></div>
+                        ))}
+                    </div>
+                </div>
+            );
+        }
+
         return (
             <div className="h-full relative overflow-hidden border-2 border-black/40 shadow-[4px_4px_0_rgba(0,0,0,0.3)]"
                  style={{ 
@@ -552,13 +633,20 @@ export const BandMemberVisual: React.FC<BandMemberVisualProps> = ({
                         {jacketStyle === 'hoodie' && (
                             <div className="absolute top-2 left-1/2 -translate-x-1/2 w-10 h-10 rounded-b-xl bg-black/20 border-b border-black/10"></div>
                         )}
-                        {(!capeType || capeType === 'none' || capeType === 'side') && uniform.logoPlacement?.position === 'BACK' && uniform.logoPlacement.enabled && logoGrid && (
-                            <div className="absolute top-4 left-1/2 -translate-x-1/2 scale-[0.4]"
-                                style={{ transform: `translate(${uniform.logoPlacement.xOffset || 0}px, ${uniform.logoPlacement.yOffset || 0}px) scale(0.4)` }}
+                        {(!capeType || capeType === 'none' || capeType === 'side') && uniform.logoPlacement?.position === 'BACK' && uniform.logoPlacement.enabled && activeLogoGrid && (
+                            <div className="absolute top-4 left-1/2 -translate-x-1/2 scale-[0.4] relative"
+                                style={{ transform: `translate(${uniform.logoPlacement.logoXOffset || 0}px, ${uniform.logoPlacement.logoYOffset || 0}px) scale(0.4)` }}
                             >
-                                 <div className="grid grid-cols-10 gap-0" style={{ width: '40px', height: '40px' }}>
-                                    {logoGrid.map((c, i) => <div key={i} style={{ backgroundColor: c }}></div>)}
+                                 <div className="grid gap-0" style={{ gridTemplateColumns: `repeat(${Math.sqrt(activeLogoGrid.length)}, 1fr)`, width: '40px', height: '40px' }}>
+                                    {activeLogoGrid.map((c, i) => <div key={i} style={{ backgroundColor: c }}></div>)}
                                  </div>
+                                 {activeLogoText && (
+                                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                         <span className="font-black text-white drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)]" style={{ fontSize: '16px', WebkitTextStroke: '1px black' }}>
+                                             {activeLogoText}
+                                         </span>
+                                     </div>
+                                 )}
                             </div>
                         )}
                         {uniform.logoPlacement?.customText && (!capeType || capeType === 'none') && (
@@ -588,19 +676,24 @@ export const BandMemberVisual: React.FC<BandMemberVisualProps> = ({
                     <>
                         {jacketStyle === 'pride_shirt' && (
                             <div className="absolute inset-0 flex flex-col items-center justify-center">
-                                <div className="text-[10px] font-black text-white drop-shadow-md uppercase tracking-widest" style={{ color: secondaryColor }}>
-                                    PRIDE
+                                <div className="text-[10px] font-black text-white drop-shadow-md uppercase tracking-widest truncate px-1 w-full text-center" style={{ color: secondaryColor }}>
+                                    {prideText}
                                 </div>
+                                {prideYear && (
+                                    <div className="text-[6px] font-bold text-white drop-shadow-md" style={{ color: secondaryColor }}>
+                                        EST. {prideYear}
+                                    </div>
+                                )}
                             </div>
                         )}
                         {jacketStyle === 'varsity' && (
                             <div className="absolute inset-0 flex flex-col items-center">
                                 <div className="h-full border-r border-l w-4 border-gray-400/30 flex flex-col items-center gap-2 pt-2">
-                                    <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
-                                    <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
-                                    <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
+                                    <div className="w-1.5 h-1.5 rounded-full" style={{backgroundColor: secondaryColor}}></div>
+                                    <div className="w-1.5 h-1.5 rounded-full" style={{backgroundColor: secondaryColor}}></div>
+                                    <div className="w-1.5 h-1.5 rounded-full" style={{backgroundColor: secondaryColor}}></div>
                                 </div>
-                                <div className="absolute top-2 left-1 text-[8px] font-black text-white drop-shadow-md">
+                                <div className="absolute top-2 left-1 text-[8px] font-black drop-shadow-md" style={{color: secondaryColor}}>
                                     {uniform.name.charAt(0)}
                                 </div>
                             </div>
@@ -638,7 +731,7 @@ export const BandMemberVisual: React.FC<BandMemberVisualProps> = ({
                         )}
                         {jacketStyle === 'suit' && (
                             <div className="absolute top-0 w-full h-full flex flex-col items-center">
-                                <div className="w-4 h-16 bg-white absolute top-0 border-x border-gray-300"></div>
+                                <div className="w-4 h-16 absolute top-0 border-x border-gray-300" style={{backgroundColor: secondaryColor}}></div>
                                 <div className="w-2 h-10 absolute top-0 border border-black/20" style={{backgroundColor: tieColor}}></div>
                                 <div className="w-full h-full border-l-[12px] border-r-[12px] border-transparent" style={{ borderColor: `${jacketColor} transparent` }}></div>
                                 <div className="absolute top-12 w-1 h-1 bg-black/50 rounded-full"></div>
@@ -683,14 +776,14 @@ export const BandMemberVisual: React.FC<BandMemberVisualProps> = ({
                         )}
                         {jacketStyle === 'military' && (
                             <div className="flex flex-col items-center pt-2 gap-2 w-full relative">
-                                <div className="w-full h-1 bg-yellow-400 opacity-50"></div>
-                                <div className="w-8 h-0.5 bg-yellow-400" style={{ backgroundColor: secondaryColor }}></div>
-                                <div className="w-8 h-0.5 bg-yellow-400" style={{ backgroundColor: secondaryColor }}></div>
-                                <div className="w-8 h-0.5 bg-yellow-400" style={{ backgroundColor: secondaryColor }}></div>
+                                <div className="w-full h-1 opacity-50" style={{ backgroundColor: secondaryColor }}></div>
+                                <div className="w-8 h-0.5" style={{ backgroundColor: secondaryColor }}></div>
+                                <div className="w-8 h-0.5" style={{ backgroundColor: secondaryColor }}></div>
+                                <div className="w-8 h-0.5" style={{ backgroundColor: secondaryColor }}></div>
                                 {uniform.jacketVariant === 1 && (
                                     <>
-                                        <div className="absolute top-2 left-1 w-1.5 h-6 bg-yellow-500 rounded-sm"></div>
-                                        <div className="absolute top-2 right-1 w-1.5 h-6 bg-yellow-500 rounded-sm"></div>
+                                        <div className="absolute top-2 left-1 w-1.5 h-6 rounded-sm" style={{ backgroundColor: secondaryColor }}></div>
+                                        <div className="absolute top-2 right-1 w-1.5 h-6 rounded-sm" style={{ backgroundColor: secondaryColor }}></div>
                                     </>
                                 )}
                             </div>
@@ -730,9 +823,9 @@ export const BandMemberVisual: React.FC<BandMemberVisualProps> = ({
                         )}
                         {jacketStyle === 'tuxedo' && (
                             <div className="absolute inset-0 flex flex-col items-center">
-                                <div className="w-1/2 h-full bg-white border-x border-black/20">
+                                <div className="w-1/2 h-full border-x border-black/20" style={{backgroundColor: secondaryColor}}>
                                     <div className="w-full h-4 bg-black/80 flex justify-center items-center mt-2">
-                                        <div className="w-2 h-1 bg-white"></div>
+                                        <div className="w-2 h-1" style={{backgroundColor: secondaryColor}}></div>
                                     </div>
                                     <div className="w-1 h-1 bg-black rounded-full mx-auto mt-2"></div>
                                     <div className="w-1 h-1 bg-black rounded-full mx-auto mt-2"></div>
@@ -780,13 +873,20 @@ export const BandMemberVisual: React.FC<BandMemberVisualProps> = ({
                                 <div className="absolute top-0 right-0 w-5 h-3 bg-yellow-500 border border-black/20 rounded-bl"></div>
                             </>
                         )}
-                        {logoGrid && uniform.logoPlacement?.enabled && uniform.logoPlacement.position.includes('CHEST') && (
-                            <div className={`absolute top-3 ${uniform.logoPlacement.position === 'CHEST_CENTER' ? 'left-1/2 -translate-x-1/2' : 'left-1'} scale-[0.3] z-20`}
+                        {activeLogoGrid && uniform.logoPlacement?.enabled && uniform.logoPlacement.position.includes('CHEST') && (
+                            <div className={`absolute top-3 ${uniform.logoPlacement.position === 'CHEST_CENTER' ? 'left-1/2 -translate-x-1/2' : 'left-1'} scale-[0.3] z-20 relative`}
                                  style={{ transform: `translate(${uniform.logoPlacement.logoXOffset || 0}px, ${uniform.logoPlacement.logoYOffset || 0}px) scale(0.3)` }}
                             >
-                                 <div className="grid grid-cols-10 gap-0" style={{ width: '40px', height: '40px' }}>
-                                    {logoGrid.map((c, i) => <div key={i} style={{ backgroundColor: c }}></div>)}
+                                 <div className="grid gap-0" style={{ gridTemplateColumns: `repeat(${Math.sqrt(activeLogoGrid.length)}, 1fr)`, width: '40px', height: '40px' }}>
+                                    {activeLogoGrid.map((c, i) => <div key={i} style={{ backgroundColor: c }}></div>)}
                                  </div>
+                                 {activeLogoText && (
+                                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                         <span className="font-black text-white drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)]" style={{ fontSize: '16px', WebkitTextStroke: '1px black' }}>
+                                             {activeLogoText}
+                                         </span>
+                                     </div>
+                                 )}
                             </div>
                         )}
                         {uniform.logoPlacement?.customText && (!capeType || capeType === 'none') && (
@@ -813,25 +913,26 @@ export const BandMemberVisual: React.FC<BandMemberVisualProps> = ({
         // ... (existing instrument logic)
         if (!showInstrument || instrument === InstrumentType.MACE || view === 'BACK') return null;
         const config = instrumentConfig || { primaryColor: '#ccc', secondaryColor: '#999', finish: 'SHINY', type: 'BRASS' };
+        console.log("BandMemberVisual config:", config, "instrument:", instrument);
         
         if (instrument === InstrumentType.PICCOLO || instrument === InstrumentType.FLUTE) {
             const isPiccolo = instrument === InstrumentType.PICCOLO;
-            return <div className={`relative ${isPlaying ? 'top-[-5px]' : 'top-4'} left-6 z-50`}><div className={`${isPiccolo ? 'w-10' : 'w-16'} h-1 bg-gray-300 border border-gray-400 rotate-[-5deg] shadow-sm relative`} style={getFinishStyle('SHINY', isPiccolo ? '#222' : '#ddd')}><div className="absolute left-2 w-1 h-1 rounded-full bg-black/20"></div><div className="absolute left-4 w-1 h-1 rounded-full bg-black/20"></div><div className="absolute left-6 w-1 h-1 rounded-full bg-black/20"></div>{!isPiccolo && <div className="absolute left-8 w-1 h-1 rounded-full bg-black/20"></div>}</div></div>;
+            return <div className={`relative ${isPlaying ? 'top-[-5px]' : 'top-4'} left-6 z-50`}><div className={`${isPiccolo ? 'w-10' : 'w-16'} h-1 border border-gray-400 rotate-[-5deg] shadow-sm relative`} style={getFinishStyle(config.finish, config.primaryColor)}><div className="absolute left-2 w-1 h-1 rounded-full bg-black/20"></div><div className="absolute left-4 w-1 h-1 rounded-full bg-black/20"></div><div className="absolute left-6 w-1 h-1 rounded-full bg-black/20"></div>{!isPiccolo && <div className="absolute left-8 w-1 h-1 rounded-full bg-black/20"></div>}</div></div>;
         }
         if (instrument === InstrumentType.CLARINET) {
-            return <div className={`relative ${isPlaying ? 'top-[-5px]' : 'top-4'} z-50 flex justify-center`}><div className="w-2 h-20 bg-[#111] border border-[#333] relative flex flex-col items-center"><div className="absolute bottom-0 w-4 h-4 bg-[#111] rounded-full clip-path-bell"></div>{[...Array(6)].map((_, i) => <div key={i} className="w-1 h-1 bg-gray-300 rounded-full my-1"></div>)}</div></div>;
+            return <div className={`relative ${isPlaying ? 'top-[-5px]' : 'top-4'} z-50 flex justify-center`}><div className="w-2 h-20 border border-[#333] relative flex flex-col items-center" style={getFinishStyle(config.finish, config.primaryColor)}><div className="absolute bottom-0 w-4 h-4 rounded-full clip-path-bell" style={getFinishStyle(config.finish, config.primaryColor)}></div>{[...Array(6)].map((_, i) => <div key={i} className="w-1 h-1 rounded-full my-1" style={{ backgroundColor: config.secondaryColor }}></div>)}</div></div>;
         }
         if (instrument === InstrumentType.SAX) {
             return (
                 <div className={`relative ${isPlaying ? 'top-[-5px]' : 'top-3'} left-4 z-50`}>
-                    <div className="w-6 h-12 border-4 border-l-0 rounded-r-full relative transform rotate-12" style={{ borderColor: '#FFD700' }}>
-                         <div className="absolute -bottom-2 -left-2 w-6 h-6 rounded-full border-4 border-t-0 border-r-0 transform -rotate-45" style={{ borderColor: '#FFD700' }}></div>
-                         <div className="absolute top-0 left-0 w-2 h-8 bg-[#FFD700] transform -rotate-12 origin-bottom"></div>
+                    <div className="w-6 h-12 border-4 border-l-0 rounded-r-full relative transform rotate-12" style={{ borderColor: config.primaryColor }}>
+                         <div className="absolute -bottom-2 -left-2 w-6 h-6 rounded-full border-4 border-t-0 border-r-0 transform -rotate-45" style={{ borderColor: config.primaryColor }}></div>
+                         <div className="absolute top-0 left-0 w-2 h-8 transform -rotate-12 origin-bottom" style={getFinishStyle(config.finish, config.primaryColor)}></div>
                          <div className="absolute top-2 left-2 flex flex-col gap-[2px]">
-                            <div className="w-1 h-1 bg-black rounded-full"></div>
-                            <div className="w-1 h-1 bg-black rounded-full"></div>
-                            <div className="w-1 h-1 bg-black rounded-full"></div>
-                            <div className="w-1 h-1 bg-black rounded-full"></div>
+                            <div className="w-1 h-1 rounded-full" style={{ backgroundColor: config.secondaryColor }}></div>
+                            <div className="w-1 h-1 rounded-full" style={{ backgroundColor: config.secondaryColor }}></div>
+                            <div className="w-1 h-1 rounded-full" style={{ backgroundColor: config.secondaryColor }}></div>
+                            <div className="w-1 h-1 rounded-full" style={{ backgroundColor: config.secondaryColor }}></div>
                          </div>
                     </div>
                 </div>
@@ -839,9 +940,9 @@ export const BandMemberVisual: React.FC<BandMemberVisualProps> = ({
         }
         if (instrument === InstrumentType.TRUMPET) {
             return (
-                <div className={`relative ${isPlaying ? 'top-[-5px]' : 'top-3'} left-4 w-16 h-2 bg-[#FFD700] shadow-sm ${isPlaying ? 'translate-x-1' : ''}`}>
+                <div className={`relative ${isPlaying ? 'top-[-5px]' : 'top-3'} left-4 w-16 h-2 shadow-sm ${isPlaying ? 'translate-x-1' : ''}`} style={{ backgroundColor: config.primaryColor }}>
                      <div className="absolute top-0 left-4 w-1 h-1 bg-white"></div>
-                     <div className="absolute right-[-4px] top-[-1px] w-3 h-4 bg-[#FFD700] clip-path-bell-forward"></div>
+                     <div className="absolute right-[-4px] top-[-1px] w-3 h-4 clip-path-bell-forward" style={{ backgroundColor: config.primaryColor }}></div>
                      <div className="absolute top-[-2px] left-6 flex gap-[2px]">
                         <div className="w-[1px] h-[2px] bg-black/50"></div>
                         <div className="w-[1px] h-[2px] bg-black/50"></div>
@@ -853,8 +954,8 @@ export const BandMemberVisual: React.FC<BandMemberVisualProps> = ({
         if (instrument === InstrumentType.MELLOPHONE) {
             return (
                 <div className={`relative ${isPlaying ? 'top-[-5px]' : 'top-3'} left-3 z-50`}>
-                    <div className="w-10 h-6 rounded-full border-[4px] border-r-0 relative shadow-md" style={{ borderColor: '#DAA520' }}>
-                        <div className="absolute top-1/2 right-[-10px] w-4 h-4 bg-[#DAA520] transform -translate-y-1/2 rounded-full">
+                    <div className="w-10 h-6 rounded-full border-[4px] border-r-0 relative shadow-md" style={{ borderColor: config.primaryColor }}>
+                        <div className="absolute top-1/2 right-[-10px] w-4 h-4 transform -translate-y-1/2 rounded-full" style={getFinishStyle(config.finish, config.primaryColor)}>
                             <div className="absolute inset-[2px] bg-black/60 rounded-full"></div>
                         </div>
                     </div>
@@ -864,20 +965,20 @@ export const BandMemberVisual: React.FC<BandMemberVisualProps> = ({
         if (instrument === InstrumentType.TROMBONE) {
             return (
                 <div className={`relative ${isPlaying ? 'top-[-5px]' : 'top-3'} left-[-10px] z-50 w-48 h-4 transition-all ${isPlaying ? 'w-56' : 'w-48'}`}>
-                    <div className="absolute top-0 w-full h-1 bg-[#FFD700]"></div>
-                    <div className="absolute top-2 w-3/4 h-1 bg-[#FFD700]"></div>
-                    <div className="absolute left-[-4px] top-0 w-1 h-3 bg-[#FFD700]"></div>
-                    <div className="absolute left-[-8px] top-[-4px] w-4 h-4 rounded-full border-[2px] border-[#FFD700]"></div>
-                    <div className={`absolute top-0 right-0 w-1 h-16 border-x-2 border-b-2 rounded-b-sm border-[#FDE047]`}></div>
+                    <div className="absolute top-0 w-full h-1" style={getFinishStyle(config.finish, config.primaryColor)}></div>
+                    <div className="absolute top-2 w-3/4 h-1" style={getFinishStyle(config.finish, config.primaryColor)}></div>
+                    <div className="absolute left-[-4px] top-0 w-1 h-3" style={getFinishStyle(config.finish, config.primaryColor)}></div>
+                    <div className="absolute left-[-8px] top-[-4px] w-4 h-4 rounded-full border-[2px]" style={{ borderColor: config.primaryColor }}></div>
+                    <div className={`absolute top-0 right-0 w-1 h-16 border-x-2 border-b-2 rounded-b-sm`} style={{ borderColor: config.primaryColor }}></div>
                 </div>
             );
         }
         if (instrument === InstrumentType.BARITONE) {
             return (
                 <div className={`relative ${isPlaying ? 'top-[-5px]' : 'top-3'} left-2 z-50`}>
-                    <div className="w-16 h-6 border-y-[3px] border-l-[3px] border-r-0 rounded-l-lg relative" style={{ borderColor: '#DAA520' }}>
-                         <div className="absolute right-[-12px] top-[-4px] w-6 h-8 bg-[#DAA520] clip-path-bell-forward"></div>
-                         <div className="absolute bottom-[-3px] left-0 w-full h-[2px] bg-[#8B4513]/80"></div>
+                    <div className="w-16 h-6 border-y-[3px] border-l-[3px] border-r-0 rounded-l-lg relative" style={{ borderColor: config.primaryColor }}>
+                         <div className="absolute right-[-12px] top-[-4px] w-6 h-8 clip-path-bell-forward" style={getFinishStyle(config.finish, config.primaryColor)}></div>
+                         <div className="absolute bottom-[-3px] left-0 w-full h-[2px] bg-black/20"></div>
                     </div>
                 </div>
             );
@@ -885,8 +986,8 @@ export const BandMemberVisual: React.FC<BandMemberVisualProps> = ({
         if (instrument === InstrumentType.TUBA) {
             return (
                 <div className={`relative ${isPlaying ? 'top-[-30px]' : 'top-[-20px]'} left-[-15px] z-50`}>
-                     <div className="w-24 h-24 rounded-full border-[8px] relative shadow-2xl" style={{ borderColor: '#E5E7EB' }}>
-                        <div className="absolute -top-12 left-1/2 -translate-x-1/2 w-16 h-16 rounded-full border-[4px] bg-[#E5E7EB]" style={{ borderColor: '#D1D5DB' }}>
+                     <div className="w-24 h-24 rounded-full border-[8px] relative shadow-2xl" style={{ borderColor: config.primaryColor }}>
+                        <div className="absolute -top-12 left-1/2 -translate-x-1/2 w-16 h-16 rounded-full border-[4px]" style={{ borderColor: config.primaryColor, ...getFinishStyle(config.finish, config.primaryColor) }}>
                             <div className="absolute inset-2 rounded-full border-[2px] border-black/10 bg-black/20"></div>
                         </div>
                      </div>
@@ -897,19 +998,19 @@ export const BandMemberVisual: React.FC<BandMemberVisualProps> = ({
             return <div className="relative top-12"><div className="w-16 h-10 border-4 border-black/40 shadow-xl relative overflow-hidden" style={getFinishStyle(config.finish, config.primaryColor)}><div className="absolute top-0 w-full h-2 border-b border-black/30" style={{ backgroundColor: config.secondaryColor }}></div><div className="absolute bottom-0 w-full h-2 border-t border-black/30" style={{ backgroundColor: config.secondaryColor }}></div><div className="absolute inset-0 opacity-10 bg-[repeating-linear-gradient(45deg,transparent,transparent_2px,white_2px,white_4px)]"></div></div></div>;
         }
         if (instrument === InstrumentType.TENOR_QUADS) {
-             return <div className="relative top-12 flex justify-center gap-0.5">{[1,2,3,4].map(i => <div key={i} className="w-4 h-6 border-2 border-black/40 bg-white" style={{backgroundColor: config.primaryColor}}></div>)}</div>;
+             return <div className="relative top-12 flex justify-center gap-0.5">{[1,2,3,4].map(i => <div key={i} className="w-4 h-6 border-2 border-black/40 relative overflow-hidden" style={getFinishStyle(config.finish, config.primaryColor)}><div className="absolute bottom-0 w-full h-1" style={{backgroundColor: config.secondaryColor}}></div></div>)}</div>;
         }
         if (instrument === InstrumentType.TENOR_CHEST) {
-            return <div className="relative top-8 flex justify-center z-50"><div className="w-14 h-14 rounded-full border-4 border-black/60 bg-white shadow-2xl relative" style={{backgroundColor: config.primaryColor}}><div className="absolute inset-0 rounded-full border-4 border-white/50 opacity-50"></div><div className="absolute inset-2 rounded-full bg-white border border-black/10 flex items-center justify-center"><div className="w-4 h-4 bg-black/10 rounded-full"></div></div></div></div>;
+            return <div className="relative top-8 flex justify-center z-50"><div className="w-14 h-14 rounded-full border-4 border-black/60 shadow-2xl relative overflow-hidden" style={getFinishStyle(config.finish, config.primaryColor)}><div className="absolute inset-0 rounded-full border-4 border-white/50 opacity-50"></div><div className="absolute inset-2 rounded-full border border-black/10 flex items-center justify-center" style={{backgroundColor: config.detailColor || '#fff'}}><div className="w-4 h-4 bg-black/10 rounded-full"></div></div><div className="absolute bottom-0 w-full h-2" style={{backgroundColor: config.secondaryColor}}></div></div></div>;
         }
         if (instrument === InstrumentType.TENOR_WAIST) {
-            return <div className="relative top-14 left-2 flex justify-center gap-0.5"><div className="w-12 h-8 border-4 border-black/40 bg-white rounded-b-xl shadow-lg" style={{backgroundColor: config.primaryColor}}><div className="absolute top-0 w-full h-full bg-white/20"></div></div></div>;
+            return <div className="relative top-14 left-2 flex justify-center gap-0.5"><div className="w-12 h-8 border-4 border-black/40 rounded-b-xl shadow-lg relative overflow-hidden" style={getFinishStyle(config.finish, config.primaryColor)}><div className="absolute top-0 w-full h-full bg-white/20"></div><div className="absolute bottom-0 w-full h-2" style={{backgroundColor: config.secondaryColor}}></div></div></div>;
         }
         if (instrument === InstrumentType.BASS) {
-            return <div className="relative top-4 left-[-10px] z-50"><div className="w-8 h-24 border-4 border-black/60 bg-white shadow-2xl relative transform -rotate-12" style={{backgroundColor: config.primaryColor}}><div className="absolute inset-y-0 left-0 w-2 bg-black/20"></div><div className="absolute inset-y-0 right-0 w-2 bg-black/20"></div><div className="absolute inset-0 flex items-center justify-center"><div className="w-4 h-12 bg-white rounded-full opacity-50"></div></div></div></div>;
+            return <div className="relative top-4 left-[-10px] z-50"><div className="w-8 h-24 border-4 border-black/60 shadow-2xl relative transform -rotate-12 overflow-hidden" style={getFinishStyle(config.finish, config.primaryColor)}><div className="absolute inset-y-0 left-0 w-2 bg-black/20"></div><div className="absolute inset-y-0 right-0 w-2 bg-black/20"></div><div className="absolute inset-0 flex items-center justify-center"><div className="w-4 h-12 rounded-full opacity-50" style={{backgroundColor: config.detailColor || '#fff'}}></div></div><div className="absolute top-0 w-full h-2" style={{backgroundColor: config.secondaryColor}}></div><div className="absolute bottom-0 w-full h-2" style={{backgroundColor: config.secondaryColor}}></div></div></div>;
         }
         if (instrument === InstrumentType.CYMBAL) {
-            return <div className="relative top-8 z-50 flex justify-between w-20"><div className={`w-2 h-16 bg-yellow-300 border border-black transform rotate-12 ${isPlaying ? 'translate-x-4' : ''}`} style={getFinishStyle('SHINY', '#fbbf24')}></div><div className={`w-2 h-16 bg-yellow-300 border border-black transform -rotate-12 ${isPlaying ? '-translate-x-4' : ''}`} style={getFinishStyle('SHINY', '#fbbf24')}></div></div>;
+            return <div className="relative top-8 z-50 flex justify-between w-20"><div className={`w-2 h-16 border border-black transform rotate-12 ${isPlaying ? 'translate-x-4' : ''}`} style={getFinishStyle(config.finish, config.primaryColor)}></div><div className={`w-2 h-16 border border-black transform -rotate-12 ${isPlaying ? '-translate-x-4' : ''}`} style={getFinishStyle(config.finish, config.primaryColor)}></div></div>;
         }
         if (instrument === InstrumentType.GUARD) {
             return <div className="relative top-[-40px] left-8 z-[60]"><div className="w-1 h-64 bg-gray-400 absolute left-0"></div><div className={`absolute top-4 left-1 w-32 h-24 bg-red-500 origin-left ${isPlaying ? 'animate-[wave_2s_infinite_ease-in-out]' : ''}`} style={{ backgroundColor: uniform.plumeColor || '#ef4444' }}><div className="absolute inset-0 bg-gradient-to-r from-black/20 to-transparent"></div></div></div>;
@@ -940,6 +1041,42 @@ export const BandMemberVisual: React.FC<BandMemberVisualProps> = ({
                         <div className="absolute inset-0 bg-gradient-to-br from-white/40 to-transparent"></div>
                         <div className="absolute top-1 left-1/2 -translate-x-1/2 w-2 h-2 rounded-full bg-black/20"></div>
                     </div>
+                    
+                    {uniform.logoPlacement?.position === 'CHESTPLATE' && uniform.logoPlacement.enabled && activeLogoGrid && (
+                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-30">
+                             <div 
+                                 className="relative"
+                                 style={{ 
+                                     transform: `translate(${uniform.logoPlacement.logoXOffset || 0}px, ${uniform.logoPlacement.logoYOffset || 0}px) scale(${uniform.logoPlacement.logoXScale || 1}, ${uniform.logoPlacement.logoYScale || 1})`
+                                 }}
+                             >
+                                 <div className="grid gap-0" style={{ gridTemplateColumns: `repeat(${Math.sqrt(activeLogoGrid.length)}, 1fr)`, width: '40px', height: '40px' }}>
+                                    {activeLogoGrid.map((c, i) => <div key={i} style={{ backgroundColor: c }}></div>)}
+                                 </div>
+                                 {activeLogoText && (
+                                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                         <span className="font-black text-white drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)]" style={{ fontSize: '16px', WebkitTextStroke: '1px black' }}>
+                                             {activeLogoText}
+                                         </span>
+                                     </div>
+                                 )}
+                             </div>
+                        </div>
+                    )}
+                    {uniform.logoPlacement?.position === 'CHESTPLATE' && uniform.logoPlacement?.customText && (
+                         <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-40">
+                             <div 
+                                className="text-[6px] font-black uppercase text-white/90"
+                                style={{ 
+                                    fontFamily: uniform.logoPlacement.font || 'inherit',
+                                    transform: `translate(${uniform.logoPlacement.textXOffset || 0}px, ${uniform.logoPlacement.textYOffset || 0}px) scale(${uniform.logoPlacement.textScale || 1}) ${uniform.logoPlacement.textOrientation === 'DIAGONAL' ? 'rotate(-45deg)' : ''}`,
+                                    color: uniform.logoPlacement.fontColor || '#ffffff'
+                                }}
+                             >
+                                 {uniform.logoPlacement.customText}
+                             </div>
+                         </div>
+                    )}
                  </div>
             </div>
         );
@@ -967,6 +1104,38 @@ export const BandMemberVisual: React.FC<BandMemberVisualProps> = ({
             );
         }
 
+        if (instrument === InstrumentType.MAJORETTE) {
+            return (
+                <div className="absolute top-[118px] left-1/2 flex justify-center" 
+                     style={{ 
+                         zIndex: pantsTransform.zIndex || 20,
+                         gap: `${legSpacing}px`, 
+                         height: `${legHeight}px`,
+                         transform: `translateX(-50%) translate(${pantsTransform.x || 0}px, ${pantsTransform.y || 0}px) scale(${pantsTransform.scaleX || 1}, ${pantsTransform.scaleY || 1})`,
+                         transformOrigin: 'top center'
+                     }}>
+                     <div className="h-full border-x border-black/10 relative march-leg-left" style={{ backgroundColor: appearance.skinColor, width: legWidth }}>
+                         <div className="absolute inset-0 bg-gradient-to-r from-black/20 to-transparent"></div>
+                         {/* Shimmer tights effect */}
+                         <div className="absolute inset-0 bg-white/10 mix-blend-overlay"></div>
+                         {/* Tall Boots */}
+                         <div className="absolute bottom-0 w-full h-12 border-t border-black/20" style={{backgroundColor: shoeColor}}>
+                             <div className="absolute top-0 w-full h-1 bg-white/30"></div>
+                         </div>
+                     </div>
+                     <div className="h-full border-x border-black/10 relative march-leg-right animation-delay-300" style={{ backgroundColor: appearance.skinColor, width: legWidth }}>
+                         <div className="absolute inset-0 bg-gradient-to-l from-black/20 to-transparent"></div>
+                         {/* Shimmer tights effect */}
+                         <div className="absolute inset-0 bg-white/10 mix-blend-overlay"></div>
+                         {/* Tall Boots */}
+                         <div className="absolute bottom-0 w-full h-12 border-t border-black/20" style={{backgroundColor: shoeColor}}>
+                             <div className="absolute top-0 w-full h-1 bg-white/30"></div>
+                         </div>
+                     </div>
+                </div>
+            );
+        }
+
         return (
             <div className="absolute top-[118px] left-1/2 flex justify-center" 
                  style={{ 
@@ -981,8 +1150,14 @@ export const BandMemberVisual: React.FC<BandMemberVisualProps> = ({
                      {pantsStyle !== 'slacks' && pantsStyle !== 'leggings' && pantsStyle !== 'leggings_transparent' && pantsStyle !== 'jeans' && pantsStyle !== 'sweatpants' && pantsStyle !== 'kilt' && pantsStyle !== 'pride_pants' && <div className="absolute top-0 bottom-0 left-0 w-1.5" style={{ backgroundColor: secondaryColor }}></div>}
                      {uniform.pantsVariant === 1 && <div className="absolute top-0 bottom-0 left-2 w-0.5 bg-white/30"></div>}
                      {(jacketStyle === 'tracksuit' || jacketStyle === 'windbreaker') && <div className="absolute left-0 w-1 h-full" style={{ backgroundColor: secondaryColor }}></div>}
-                     {pantsStyle === 'pride_pants' && <div className="absolute left-0 w-1 h-full" style={{ backgroundColor: secondaryColor }}></div>}
-                     {uniform.hasSpats && <div className="absolute bottom-0 w-full h-4 bg-white border-t border-black/20"></div>}
+                     {pantsStyle === 'pride_pants' && (
+                         <div className="absolute left-0 w-2 h-full flex flex-col items-center justify-center overflow-hidden" style={{ backgroundColor: secondaryColor }}>
+                             <div className="text-[5px] font-black text-white leading-none tracking-widest" style={{ writingMode: 'vertical-rl', textOrientation: 'upright' }}>
+                                 {prideYear || schoolAcronym}
+                             </div>
+                         </div>
+                     )}
+                     {uniform.hasSpats && <div className="absolute bottom-0 w-full h-4 border-t border-black/20" style={{backgroundColor: secondaryColor}}></div>}
                      {pantsStyle === 'shorts' && <div className="absolute bottom-0 w-full h-8 bg-white" style={{backgroundColor: appearance.skinColor}}></div>}
                      {pantsStyle === 'skirt' && <div className="absolute top-0 w-full h-12 bg-inherit border-b-2 border-black/20 z-10"></div>}
                      {pantsStyle === 'skirt' && <div className="absolute bottom-0 w-full h-10 bg-white" style={{backgroundColor: appearance.skinColor}}></div>}
@@ -991,15 +1166,21 @@ export const BandMemberVisual: React.FC<BandMemberVisualProps> = ({
                      {pantsStyle === 'jeans' && <div className="absolute inset-0 border-r border-yellow-600/50 mix-blend-multiply"></div>}
                      {pantsStyle === 'kilt' && <div className="absolute top-0 w-full h-16 bg-[repeating-linear-gradient(45deg,transparent,transparent_2px,rgba(0,0,0,0.2)_2px,rgba(0,0,0,0.2)_4px)] border-b-2 border-black/30 z-10"></div>}
                      {pantsStyle === 'kilt' && <div className="absolute bottom-0 w-full h-6 bg-white" style={{backgroundColor: appearance.skinColor}}></div>}
-                     {instrument === InstrumentType.MAJORETTE ? <div className="absolute bottom-0 w-full h-8 bg-white border-t border-black/20"></div> : <div className="absolute -bottom-1 w-full h-2 bg-black rounded-b" style={{backgroundColor: shoeColor}}></div>}
+                     {instrument === InstrumentType.MAJORETTE ? <div className="absolute bottom-0 w-full h-8 border-t border-black/20" style={{backgroundColor: shoeColor}}></div> : <div className="absolute -bottom-1 w-full h-2 bg-black rounded-b" style={{backgroundColor: shoeColor}}></div>}
                  </div>
                  <div className="h-full border-x border-black/10 relative march-leg-right animation-delay-300" style={{ backgroundColor: pantsStyle === 'leggings_transparent' ? appearance.skinColor : pantsColor, width: legWidth }}>
                      <div className="absolute inset-0 bg-gradient-to-l from-black/30 to-transparent"></div>
                      {pantsStyle !== 'slacks' && pantsStyle !== 'leggings' && pantsStyle !== 'leggings_transparent' && pantsStyle !== 'jeans' && pantsStyle !== 'sweatpants' && pantsStyle !== 'kilt' && pantsStyle !== 'pride_pants' && <div className="absolute top-0 bottom-0 right-0 w-1.5" style={{ backgroundColor: secondaryColor }}></div>}
                      {uniform.pantsVariant === 1 && <div className="absolute top-0 bottom-0 right-2 w-0.5 bg-white/30"></div>}
                      {(jacketStyle === 'tracksuit' || jacketStyle === 'windbreaker') && <div className="absolute right-0 w-1 h-full" style={{ backgroundColor: secondaryColor }}></div>}
-                     {pantsStyle === 'pride_pants' && <div className="absolute right-0 w-1 h-full" style={{ backgroundColor: secondaryColor }}></div>}
-                     {uniform.hasSpats && <div className="absolute bottom-0 w-full h-4 bg-white border-t border-black/20"></div>}
+                     {pantsStyle === 'pride_pants' && (
+                         <div className="absolute right-0 w-2 h-full flex flex-col items-center justify-center overflow-hidden" style={{ backgroundColor: secondaryColor }}>
+                             <div className="text-[5px] font-black text-white leading-none tracking-widest" style={{ writingMode: 'vertical-rl', textOrientation: 'upright' }}>
+                                 {prideYear || schoolAcronym}
+                             </div>
+                         </div>
+                     )}
+                     {uniform.hasSpats && <div className="absolute bottom-0 w-full h-4 border-t border-black/20" style={{backgroundColor: secondaryColor}}></div>}
                      {pantsStyle === 'shorts' && <div className="absolute bottom-0 w-full h-8 bg-white" style={{backgroundColor: appearance.skinColor}}></div>}
                      {pantsStyle === 'skirt' && <div className="absolute top-0 w-full h-12 bg-inherit border-b-2 border-black/20 z-10"></div>}
                      {pantsStyle === 'skirt' && <div className="absolute bottom-0 w-full h-10 bg-white" style={{backgroundColor: appearance.skinColor}}></div>}
@@ -1008,7 +1189,7 @@ export const BandMemberVisual: React.FC<BandMemberVisualProps> = ({
                      {pantsStyle === 'jeans' && <div className="absolute inset-0 border-l border-yellow-600/50 mix-blend-multiply"></div>}
                      {pantsStyle === 'kilt' && <div className="absolute top-0 w-full h-16 bg-[repeating-linear-gradient(45deg,transparent,transparent_2px,rgba(0,0,0,0.2)_2px,rgba(0,0,0,0.2)_4px)] border-b-2 border-black/30 z-10"></div>}
                      {pantsStyle === 'kilt' && <div className="absolute bottom-0 w-full h-6 bg-white" style={{backgroundColor: appearance.skinColor}}></div>}
-                     {instrument === InstrumentType.MAJORETTE ? <div className="absolute bottom-0 w-full h-8 bg-white border-t border-black/20"></div> : <div className="absolute -bottom-1 w-full h-2 bg-black rounded-b" style={{backgroundColor: shoeColor}}></div>}
+                     {instrument === InstrumentType.MAJORETTE ? <div className="absolute bottom-0 w-full h-8 border-t border-black/20" style={{backgroundColor: shoeColor}}></div> : <div className="absolute -bottom-1 w-full h-2 bg-black rounded-b" style={{backgroundColor: shoeColor}}></div>}
                  </div>
             </div>
         );

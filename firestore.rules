@@ -1,0 +1,95 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: {userId}
+    // Fields:
+    //   - uid: string (required) - The user's unique ID.
+    //   - displayName: string (required) - The user's display name.
+    //   - email: string (required) - The user's email address.
+    //   - photoURL: string (optional) - The user's profile photo URL.
+    //   - bio: string (optional) - The user's bio.
+    //   - createdAt: number (optional) - Timestamp of when the profile was created.
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidUser() {
+      return hasOnlyAllowedFields(['uid', 'displayName', 'email', 'photoURL', 'bio', 'createdAt']) &&
+             hasRequiredFields(['uid', 'displayName', 'email']) &&
+             request.resource.data.uid == request.auth.uid &&
+             request.resource.data.displayName is string && request.resource.data.displayName.size() > 0 && request.resource.data.displayName.size() < 100 &&
+             isValidEmail(request.resource.data.email) &&
+             (!('photoURL' in request.resource.data) || (request.resource.data.photoURL is string && request.resource.data.photoURL.size() < 1000)) &&
+             (!('bio' in request.resource.data) || (request.resource.data.bio is string && request.resource.data.bio.size() < 500)) &&
+             (!('createdAt' in request.resource.data) || request.resource.data.createdAt is number);
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      // Only the owner can read their own profile (since it contains email)
+      allow read: if isOwner(userId);
+      
+      // Only the owner can create their profile, and it must be valid
+      allow create: if isOwner(userId) && isValidUser();
+      
+      // Only the owner can update their profile, and it must be valid
+      allow update: if isOwner(userId) && isValidUser() && request.resource.data.uid == resource.data.uid && (!('createdAt' in resource.data) || request.resource.data.createdAt == resource.data.createdAt);
+    }
+
+    match /usernames/{username} {
+      allow read: if true;
+      allow create: if isAuthenticated() && request.resource.data.uid == request.auth.uid && request.resource.data.keys().hasOnly(['uid']);
+      allow update: if false; // Usernames shouldn't be updated, just deleted and recreated
+      allow delete: if isAuthenticated() && resource.data.uid == request.auth.uid;
+    }
+
+    match /community_bands/{userId} {
+      allow read: if true;
+      allow create, update: if isOwner(userId) && request.resource.data.uid == request.auth.uid && request.resource.data.keys().hasOnly(['uid', 'bandName', 'directorName', 'style', 'reputation', 'fans', 'bandData', 'updatedAt']) && request.resource.data.bandData is string && request.resource.data.bandData.size() < 1000000;
+      allow delete: if isOwner(userId);
+    }
+
+    match /user_saves/{userId} {
+      allow read: if isOwner(userId);
+      allow create, update: if isOwner(userId) && request.resource.data.uid == request.auth.uid && request.resource.data.keys().hasOnly(['uid', 'saveData', 'updatedAt']) && request.resource.data.saveData is string && request.resource.data.saveData.size() < 5000000;
+      allow delete: if isOwner(userId);
+    }
+
+    match /shared_saves/{code} {
+      allow read: if true;
+      allow create: if isAuthenticated() && !exists(/databases/$(database)/documents/shared_saves/$(code)) && request.resource.data.keys().hasOnly(['code', 'saveData', 'createdAt']) && request.resource.data.code == code && request.resource.data.saveData is string && request.resource.data.saveData.size() < 5000000;
+      allow update, delete: if false;
+    }
+  }
+}

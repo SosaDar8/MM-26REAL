@@ -5,7 +5,7 @@ export const INITIAL_DIRECTOR_MESSAGES: Message[] = [
     {
         id: 'msg-init-1',
         contactId: 'principal',
-        sender: 'Principal Skinner',
+        sender: 'President / Dean',
         text: 'Welcome to the program. The board expects results this year. Do not disappoint us.',
         timestamp: '9:00 AM',
         read: false,
@@ -18,7 +18,7 @@ export const INITIAL_DIRECTOR_MESSAGES: Message[] = [
     {
         id: 'msg-init-2',
         contactId: 'staff',
-        sender: 'Assistant Coach',
+        sender: 'Assistant Director',
         text: 'The equipment truck has a flat tire. Might be late for the opener.',
         timestamp: '9:15 AM',
         read: false,
@@ -26,6 +26,32 @@ export const INITIAL_DIRECTOR_MESSAGES: Message[] = [
         replies: [
             { label: 'Fix it now ($100)', action: 'FIX_TIRE' },
             { label: 'We march anyway', action: 'IGNORE_TIRE' }
+        ]
+    },
+    {
+        id: 'msg-init-3',
+        contactId: 'alumni_rep',
+        sender: 'Alumni Association Chair',
+        text: 'We are planning the annual gala. We would like the band to perform.',
+        timestamp: '10:00 AM',
+        read: false,
+        type: 'TEXT',
+        replies: [
+            { label: 'We would be honored.', action: 'REPLY_POSITIVE' },
+            { label: 'Let me check the schedule.', action: 'REPLY_NEUTRAL' }
+        ]
+    },
+    {
+        id: 'msg-init-4',
+        contactId: 'athletics_dir',
+        sender: 'Athletics Director',
+        text: 'We need the band to play louder during 3rd down. The football team needs the energy.',
+        timestamp: '10:30 AM',
+        read: false,
+        type: 'TEXT',
+        replies: [
+            { label: 'We will crank it up.', action: 'REPLY_POSITIVE' },
+            { label: 'We play at a balanced volume.', action: 'REPLY_NEUTRAL' }
         ]
     }
 ];
@@ -153,49 +179,69 @@ export const generateRandomMessage = (state: GameState): Message | null => {
 
     } else {
          // Director Mode Randoms
-         const roll = Math.random();
-         if (roll > 0.7) {
-             return {
-                id,
-                contactId: 'booster',
-                sender: 'Booster Club Prez',
+         const messages: Message[] = [
+             {
+                id, contactId: 'booster', sender: 'Booster Club Prez',
                 text: 'We raised some extra money selling popcorn! Adding to funds.',
-                timestamp,
-                read: false,
-                type: 'TEXT',
-                replies: [
-                    { label: 'Great work!', action: 'REPLY_POSITIVE' }
-                ]
-            };
-         } else if (roll > 0.4) {
-             return {
-                id,
-                contactId: 'parent_karen',
-                sender: 'Mrs. Johnson',
+                timestamp, read: false, type: 'TEXT',
+                replies: [{ label: 'Great work!', action: 'REPLY_POSITIVE' }]
+             },
+             {
+                id, contactId: 'parent_karen', sender: 'Mrs. Johnson',
                 text: 'Why isn\'t my son playing the solo? He is clearly the best.',
-                timestamp,
-                read: false,
-                type: 'TEXT',
+                timestamp, read: false, type: 'TEXT',
                 replies: [
                     { label: 'He needs to practice more.', action: 'REPLY_NEGATIVE' },
                     { label: 'I make the decisions.', action: 'REPLY_NEUTRAL' }
                 ]
-            };
-         } else {
-             return {
-                 id,
-                 contactId: 'admin_dean',
-                 sender: 'Dean of Students',
+             },
+             {
+                 id, contactId: 'admin_dean', sender: 'Dean of Students',
                  text: 'Noise complaints from the library about your drumline practice. Keep it down.',
-                 timestamp,
-                 read: false,
-                 type: 'TEXT',
+                 timestamp, read: false, type: 'TEXT',
                  replies: [
                      { label: 'We will move further away.', action: 'REPLY_APOLOGETIC' },
                      { label: 'This is art!', action: 'REPLY_DEFENSIVE' }
                  ]
-             };
-         }
+             },
+             {
+                 id, contactId: 'media_local', sender: 'Local News Reporter',
+                 text: 'We would love to do a feature on the band for the evening news. Are you available?',
+                 timestamp, read: false, type: 'TEXT',
+                 replies: [
+                     { label: 'Absolutely, let\'s set it up.', action: 'REPLY_POSITIVE' },
+                     { label: 'We are too busy right now.', action: 'REPLY_NEGATIVE' }
+                 ]
+             },
+             {
+                 id, contactId: 'rival_director', sender: 'Rival Band Director',
+                 text: 'I saw your last performance. Cute. Wait until you see what we have planned.',
+                 timestamp, read: false, type: 'TEXT',
+                 replies: [
+                     { label: 'Bring it on.', action: 'REPLY_DEFENSIVE' },
+                     { label: 'We focus on ourselves.', action: 'REPLY_NEUTRAL' }
+                 ]
+             },
+             {
+                 id, contactId: 'alumni_chair', sender: 'Alumni Association Chair',
+                 text: 'The alumni are very impressed with the band\'s recent progress. Keep it up!',
+                 timestamp, read: false, type: 'TEXT',
+                 replies: [
+                     { label: 'Thank you for the support.', action: 'REPLY_POSITIVE' }
+                 ]
+             },
+             {
+                 id, contactId: 'athletics_dir', sender: 'Athletics Director',
+                 text: 'Can the band learn a new stand tune before the next game? We need more hype.',
+                 timestamp, read: false, type: 'TEXT',
+                 replies: [
+                     { label: 'We will get on it.', action: 'REPLY_POSITIVE' },
+                     { label: 'Our repertoire is set.', action: 'REPLY_NEGATIVE' }
+                 ]
+             }
+         ];
+         
+         return messages[Math.floor(Math.random() * messages.length)];
     }
 
     return null;

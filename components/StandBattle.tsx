@@ -55,7 +55,27 @@ export const StandBattle: React.FC<StandBattleProps> = ({
   const [lastPlayerScore, setLastPlayerScore] = useState(0);
   const [lastOpponentScore, setLastOpponentScore] = useState(0);
 
-  const opponentData = useMemo(() => generateOpponentIdentity(opponentName), [opponentName]);
+  const opponentData = useMemo(() => {
+      if (gameState?.rivalIdentity && gameState?.activeEventId?.startsWith('COMMUNITY_BATTLE')) {
+          return {
+              identity: gameState.rivalIdentity,
+              uniform: { 
+                  id: `opp_community`, 
+                  name: gameState.rivalIdentity.schoolName, 
+                  jacketColor: gameState.rivalIdentity.primaryColor, 
+                  pantsColor: gameState.rivalIdentity.secondaryColor, 
+                  hatColor: gameState.rivalIdentity.primaryColor, 
+                  plumeColor: gameState.rivalIdentity.secondaryColor, 
+                  accentColor: gameState.rivalIdentity.secondaryColor, 
+                  hatStyle: 'shako', 
+                  jacketStyle: 'classic', 
+                  pantsStyle: 'regular', 
+                  isDrumMajor: false 
+              }
+          };
+      }
+      return generateOpponentIdentity(opponentName);
+  }, [opponentName, gameState?.rivalIdentity, gameState?.activeEventId]);
 
   useEffect(() => {
     generateAnnouncerCommentary("Stand battle starting", 0, 50).then(setAnnouncerText);
@@ -145,7 +165,29 @@ export const StandBattle: React.FC<StandBattleProps> = ({
 
           setTimeout(() => {
               if (round >= 3) {
-                  if (playerScore + finalPlayerScore > opponentScore + finalOppScore) {
+                  const isWin = playerScore + finalPlayerScore > opponentScore + finalOppScore;
+                  
+                  // Award clips for the battle
+                  window.dispatchEvent(new CustomEvent('mf-phone-action', {
+                      detail: { action: 'ADD_CLIPS', data: 2 } // Battles are intense, 2 clips
+                  }));
+
+                  // Add battle video to MeTube
+                  const battleVideo = {
+                      id: `battle-${Date.now()}`,
+                      title: `${isWin ? 'VICTORY' : 'BATTLE'} vs ${opponentData.identity.schoolName}`,
+                      thumbnail: `https://picsum.photos/seed/battle-${Date.now()}/400/225`,
+                      views: Math.floor(Math.random() * 5000) + 1000,
+                      likes: Math.floor(Math.random() * 500) + 50,
+                      duration: "3:45",
+                      timestamp: "Just now",
+                      category: 'BATTLE'
+                  };
+                  window.dispatchEvent(new CustomEvent('mf-phone-action', {
+                      detail: { action: 'ADD_BATTLE_VIDEO', data: battleVideo }
+                  }));
+
+                  if (isWin) {
                       onWin(1000);
                   } else {
                       onLose();
@@ -167,17 +209,26 @@ export const StandBattle: React.FC<StandBattleProps> = ({
       
       return (
           <div className="flex gap-4 items-end justify-center transform scale-75">
-              {Array.from({length: count}).map((_, i) => (
-                  <div key={i} className={`transform ${isPlayer ? '' : 'scale-x-[-1]'}`}>
-                      <BandMemberVisual 
-                          instrument={instruments[i % instruments.length]}
-                          uniform={displayUniform}
-                          appearance={getRandomAppearance()}
-                          scale={1.2}
-                          isPlaying={true}
-                      />
-                  </div>
-              ))}
+              {Array.from({length: count}).map((_, i) => {
+                  let appearance = getRandomAppearance();
+                  if (isPlayer && members[i]) {
+                      appearance = members[i].appearance;
+                  } else if (!isPlayer && gameState?.rivalMembers && gameState.rivalMembers[i]) {
+                      appearance = gameState.rivalMembers[i].appearance;
+                  }
+
+                  return (
+                      <div key={i} className={`transform ${isPlayer ? '' : 'scale-x-[-1]'}`}>
+                          <BandMemberVisual 
+                              instrument={instruments[i % instruments.length]}
+                              uniform={displayUniform}
+                              appearance={appearance}
+                              scale={1.2}
+                              isPlaying={true}
+                          />
+                      </div>
+                  );
+              })}
           </div>
       );
   };
@@ -288,6 +339,8 @@ export const StandBattle: React.FC<StandBattleProps> = ({
                      tuneType="BATTLE"
                      environment="ARENA"
                      members={members} // Pass actual members so visualizer shows them
+                     logoGrid={identity?.bandLogo || gameState?.identity.bandLogo}
+                     logoText={identity?.bandLogoText || gameState?.identity.bandLogoText}
                    />
                </div>
            )}

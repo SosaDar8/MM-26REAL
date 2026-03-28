@@ -92,6 +92,8 @@ export const Tutorial: React.FC<TutorialProps> = ({ gameState, onComplete }) => 
                             dmUniform={gameState.uniforms.find(u => u.id === gameState.dmUniformId) || gameState.uniforms.find(u => u.isDrumMajor)}
                             majoretteUniform={gameState.uniforms.find(u => u.id === gameState.majoretteUniformId)}
                             guardUniform={gameState.uniforms.find(u => u.id === gameState.guardUniformId)}
+                            logoGrid={gameState.identity.bandLogo}
+                            logoText={gameState.identity.bandLogoText}
                          />
                     </div>
                 )}

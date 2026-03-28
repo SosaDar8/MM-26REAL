@@ -5,6 +5,7 @@ import { BankApp } from './BankApp';
 import { MessageApp } from './MessageApp';
 import { StatsApp } from './StatsApp';
 import { WALLPAPERS, GAME_VERSION } from '../constants';
+import { Button } from './Button';
 
 interface PhoneUIProps {
     gameState: GameState;
@@ -45,7 +46,11 @@ export const PhoneUI: React.FC<PhoneUIProps> = ({ gameState, setPhase, onTransac
             lastSaveDate: new Date().toLocaleString()
         };
         localStorage.setItem(`MF_SAVE_${slotId}`, JSON.stringify(saveData));
-        alert(`Game Saved to Slot ${slotId}!`);
+        setModalConfig({
+            isOpen: true,
+            title: "Game Saved",
+            message: `Game Saved to Slot ${slotId}!`
+        });
         setActiveApp(null);
     };
 
@@ -53,6 +58,11 @@ export const PhoneUI: React.FC<PhoneUIProps> = ({ gameState, setPhase, onTransac
     const wallpaperColor = WALLPAPERS.find(w => w.id === gameState.phoneSettings.wallpaper)?.color || '#0f172a';
 
     const [showWipeConfirm, setShowWipeConfirm] = useState(false);
+    const [modalConfig, setModalConfig] = useState<{
+        isOpen: boolean;
+        title: string;
+        message: string;
+    }>({ isOpen: false, title: '', message: '' });
 
     // Renders the specific app content
     const renderAppContent = () => {
@@ -250,6 +260,17 @@ export const PhoneUI: React.FC<PhoneUIProps> = ({ gameState, setPhase, onTransac
                     </div>
                 </div>
             </div>
+            {modalConfig.isOpen && (
+                <div className="fixed inset-0 bg-black/80 z-[70] flex items-center justify-center p-4">
+                    <div className="bg-slate-900 border-2 border-slate-600 p-6 max-w-sm w-full relative">
+                        <h3 className="text-xl font-bold text-white mb-4 font-pixel">{modalConfig.title}</h3>
+                        <p className="text-gray-300 mb-6 text-sm">{modalConfig.message}</p>
+                        <div className="flex justify-end gap-3">
+                            <Button onClick={() => setModalConfig({ ...modalConfig, isOpen: false })} variant="primary">OK</Button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </>
     );
 };

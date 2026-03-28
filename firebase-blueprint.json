@@ -1,0 +1,150 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "A user's profile information.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "The user's unique ID."
+        },
+        "displayName": {
+          "type": "string",
+          "description": "The user's display name."
+        },
+        "email": {
+          "type": "string",
+          "description": "The user's email address."
+        },
+        "photoURL": {
+          "type": "string",
+          "description": "The user's profile photo URL."
+        },
+        "bio": {
+          "type": "string",
+          "description": "The user's bio."
+        },
+        "createdAt": {
+          "type": "number",
+          "description": "Timestamp of when the profile was created."
+        }
+      },
+      "required": ["uid", "displayName", "email"]
+    },
+    "UsernameRecord": {
+      "title": "UsernameRecord",
+      "description": "Maps a lowercase username to a user ID to enforce uniqueness.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "The user's unique ID."
+        }
+      },
+      "required": ["uid"]
+    },
+    "CommunityBand": {
+      "title": "CommunityBand",
+      "description": "A player's uploaded band for asynchronous multiplayer.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "The user's unique ID."
+        },
+        "bandName": {
+          "type": "string",
+          "description": "The name of the band."
+        },
+        "directorName": {
+          "type": "string",
+          "description": "The name of the director."
+        },
+        "style": {
+          "type": "string",
+          "description": "The style of the band."
+        },
+        "reputation": {
+          "type": "number",
+          "description": "The band's reputation."
+        },
+        "fans": {
+          "type": "number",
+          "description": "The band's fan count."
+        },
+        "bandData": {
+          "type": "string",
+          "description": "JSON stringified band data (members, uniforms, identity)."
+        },
+        "updatedAt": {
+          "type": "number",
+          "description": "Timestamp of last upload."
+        }
+      },
+      "required": ["uid", "bandName", "directorName", "style", "reputation", "fans", "bandData", "updatedAt"]
+    },
+    "UserSave": {
+      "title": "UserSave",
+      "description": "A player's full game state saved to the cloud.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "The user's unique ID."
+        },
+        "saveData": {
+          "type": "string",
+          "description": "JSON stringified full game state."
+        },
+        "updatedAt": {
+          "type": "number",
+          "description": "Timestamp of last save."
+        }
+      },
+      "required": ["uid", "saveData", "updatedAt"]
+    },
+    "SharedSave": {
+      "title": "SharedSave",
+      "description": "A game save shared via a short code.",
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "string",
+          "description": "The 6-character share code."
+        },
+        "saveData": {
+          "type": "string",
+          "description": "JSON stringified game state."
+        },
+        "createdAt": {
+          "type": "number",
+          "description": "Timestamp of when the save was shared."
+        }
+      },
+      "required": ["code", "saveData", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Stores user profiles."
+    },
+    "/usernames/{username}": {
+      "schema": { "$ref": "#/entities/UsernameRecord" },
+      "description": "Stores claimed usernames."
+    },
+    "/community_bands/{userId}": {
+      "schema": { "$ref": "#/entities/CommunityBand" },
+      "description": "Stores uploaded bands for community features."
+    },
+    "/user_saves/{userId}": {
+      "schema": { "$ref": "#/entities/UserSave" },
+      "description": "Stores full game saves for cloud sync."
+    },
+    "/shared_saves/{code}": {
+      "schema": { "$ref": "#/entities/SharedSave" },
+      "description": "Stores game saves shared via a short code."
+    }
+  }
+}

@@ -2,10 +2,10 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Button } from './Button';
 import { RhythmGame } from './RhythmGame';
-import { GameState, EventType, InstrumentType, BandMember, WeatherCondition, MusicTrack } from '../types';
+import { GameState, EventType, InstrumentType, BandMember, WeatherCondition, MusicTrack, BandIdentity } from '../types';
 import { soundManager } from '../services/soundManager';
 import { BandMemberVisual } from './BandMemberVisual';
-import { DEFAULT_UNIFORMS, getSchoolSongs, getRandomAppearance, generateOpponentIdentity, RIVAL_CHANTS, GRID_SIZE } from '../constants';
+import { DEFAULT_UNIFORMS, getSchoolSongs, getRandomAppearance, generateOpponentIdentity, RIVAL_CHANTS, GRID_SIZE, SCHOOL_PREFIXES, SCHOOL_NOUNS } from '../constants';
 import { StandBattle } from './StandBattle';
 import { HackerMenu } from './HackerMenu';
 
@@ -32,11 +32,13 @@ const QUARTER_LENGTH_SECONDS = 900; // 15 mins
 
 export const GameDay: React.FC<GameDayProps> = ({ gameState, onEndGame, setGameState }) => {
     const currentEvent = gameState.schedule.find(e => e.id === gameState.activeEventId) || gameState.schedule[0];
+    console.log("gameState:", gameState);
+    console.log("currentEvent type:", currentEvent.type);
     const isFootball = currentEvent.type === EventType.FOOTBALL_GAME || currentEvent.type === EventType.HOMECOMING;
     const isBasketball = currentEvent.type === EventType.BASKETBALL_GAME;
     const isGame = isFootball || isBasketball;
     const isParade = currentEvent.type === EventType.PARADE;
-    const isBattle = currentEvent.type === EventType.BATTLE;
+    const isBattle = currentEvent.type === EventType.BATTLE || currentEvent.type === 'Battle of the Bands';
     const isConcert = currentEvent.type === EventType.CONCERT;
     const isHomecoming = currentEvent.type === EventType.HOMECOMING;
 
@@ -96,7 +98,27 @@ export const GameDay: React.FC<GameDayProps> = ({ gameState, onEndGame, setGameS
     const [activeChant, setActiveChant] = useState<string | null>(null);
     const [showHackerMenu, setShowHackerMenu] = useState(false);
 
-    const opponentData = useMemo(() => generateOpponentIdentity(currentEvent.opponent || 'RIVAL'), [currentEvent.opponent]);
+    const opponentData = useMemo(() => {
+        if (gameState.rivalIdentity && currentEvent.id.startsWith('COMMUNITY_BATTLE')) {
+            return {
+                identity: gameState.rivalIdentity,
+                uniform: { 
+                    id: `opp_community`, 
+                    name: gameState.rivalIdentity.schoolName, 
+                    jacketColor: gameState.rivalIdentity.primaryColor, 
+                    pantsColor: gameState.rivalIdentity.secondaryColor, 
+                    hatColor: gameState.rivalIdentity.primaryColor, 
+                    plumeColor: gameState.rivalIdentity.secondaryColor, 
+                    accentColor: gameState.rivalIdentity.secondaryColor, 
+                    hatStyle: 'shako', 
+                    jacketStyle: 'classic', 
+                    pantsStyle: 'regular', 
+                    isDrumMajor: false 
+                }
+            };
+        }
+        return generateOpponentIdentity(currentEvent.opponent || 'RIVAL');
+    }, [currentEvent.opponent, currentEvent.id, gameState.rivalIdentity]);
 
     // Check for valid field show (Drill)
     const hasFieldShow = useMemo(() => {
@@ -598,6 +620,7 @@ export const GameDay: React.FC<GameDayProps> = ({ gameState, onEndGame, setGameS
     };
 
     const startShow = () => {
+        console.log("startShow called. isGame:", isGame, "isBattle:", isBattle, "currentEvent:", currentEvent);
         if (isGame) {
             if (phase === 'HALFTIME_SHOW') {
                 if (!hasFieldShow) {
@@ -616,11 +639,13 @@ export const GameDay: React.FC<GameDayProps> = ({ gameState, onEndGame, setGameS
                 setIsPlayingTune(true);
             }
         } else if (isBattle) {
+            console.log("Initiating battle...");
             const numBands = Math.floor(Math.random() * 2) + 2; // 2 or 3 bands
             const bands = Array.from({ length: numBands }, () => generateOpponentIdentity(SCHOOL_PREFIXES[Math.floor(Math.random() * SCHOOL_PREFIXES.length)] + " " + SCHOOL_NOUNS[Math.floor(Math.random() * SCHOOL_NOUNS.length)]));
             setBandsToWatch(bands.map(b => b.identity));
             setCurrentBandIndex(0);
             setStandBattleState('WATCHING_OTHER_BANDS');
+            setPlayDescription("Watching other bands perform...");
         } else {
             setTuneType(isConcert ? 'SHOW' : 'STAND'); 
             setIsPlayingTune(true);
@@ -631,6 +656,23 @@ export const GameDay: React.FC<GameDayProps> = ({ gameState, onEndGame, setGameS
         addLog(`🏆 WON THE BATTLE! THE CROWD LOVES IT!`);
         setMomentum(m => Math.min(100, m + 30));
         setHomeScore(s => s + 3);
+        
+        // Add Stand Battle Video to MeTube
+        setGameState(prev => ({
+            ...prev,
+            uploadedVideos: [{
+                id: `battle-${Date.now()}`,
+                title: `EPIC STAND BATTLE vs ${opponentData.identity.schoolName} (WE WON!)`,
+                views: Math.floor(Math.random() * 50000) + 10000,
+                comments: Math.floor(Math.random() * 500) + 100,
+                likes: Math.floor(Math.random() * 5000) + 1000,
+                duration: "3:45",
+                thumbnailId: Math.floor(Math.random() * 5),
+                uploadedAt: Date.now(),
+                uniform: prev.uniforms.find(u => u.id === prev.currentUniformId) || prev.uniforms[0]
+            }, ...(prev.uploadedVideos || [])]
+        }));
+
         if(isBattle) {
             if (window.confirm("You won! Do you want to stay and watch the final band battle?")) {
                 setStandBattleState('WATCHING_FINAL_BATTLE');
@@ -651,6 +693,23 @@ export const GameDay: React.FC<GameDayProps> = ({ gameState, onEndGame, setGameS
     const handleBattleLose = () => {
         addLog(`💀 LOST THE BATTLE. ${opponentData.identity.schoolName} takes the glory.`);
         setMomentum(m => Math.max(0, m - 20));
+        
+        // Add Stand Battle Video to MeTube
+        setGameState(prev => ({
+            ...prev,
+            uploadedVideos: [{
+                id: `battle-${Date.now()}`,
+                title: `Stand Battle vs ${opponentData.identity.schoolName} (Tough Loss)`,
+                views: Math.floor(Math.random() * 20000) + 5000,
+                comments: Math.floor(Math.random() * 200) + 50,
+                likes: Math.floor(Math.random() * 1000) + 200,
+                duration: "3:15",
+                thumbnailId: Math.floor(Math.random() * 5),
+                uploadedAt: Date.now(),
+                uniform: prev.uniforms.find(u => u.id === prev.currentUniformId) || prev.uniforms[0]
+            }, ...(prev.uploadedVideos || [])]
+        }));
+
         if(isBattle) {
             if (window.confirm("You lost! Do you want to stay and watch the final band battle?")) {
                 setStandBattleState('WATCHING_FINAL_BATTLE');
@@ -685,6 +744,9 @@ export const GameDay: React.FC<GameDayProps> = ({ gameState, onEndGame, setGameS
 
         setIsPlayingTune(false);
         soundManager.stopSequence();
+        
+        // Gain a band clip for playing in rhythm game/field show
+        setGameState(prev => ({ ...prev, clips: (prev.clips || 0) + 1 }));
         
         const pointsAdded = Math.floor(score / 500);
         if (isGame) {
@@ -933,7 +995,7 @@ export const GameDay: React.FC<GameDayProps> = ({ gameState, onEndGame, setGameS
                              phase === 'MARCH_OUT' ? 'POST-GAME SHOW' :
                              `Q${quarter} ${formatTime(gameSeconds)}`
                          ) : (
-                             isConcert ? "ON STAGE" : "PARADE ROUTE"
+                             isConcert ? "ON STAGE" : isBattle ? "BATTLE OF THE BANDS" : "PARADE ROUTE"
                          )}
                      </div>
                      <div className="text-xs text-blue-300 font-bold uppercase mt-1 tracking-widest flex items-center justify-center gap-2">
@@ -990,13 +1052,16 @@ export const GameDay: React.FC<GameDayProps> = ({ gameState, onEndGame, setGameS
                          </div>
                          <RhythmGame
                             difficulty="easy"
+                            skill={(gameState as any).stats?.skill || gameState.career?.skill || 50}
                             onComplete={handleRhythmComplete}
                             uniform={gameState.uniforms.find(u => u.id === gameState.currentUniformId) || gameState.uniforms[0]}
                             dmUniform={dmUniform}
                             majoretteUniform={majoretteUniform}
                             guardUniform={guardUniform}
-                            members={activeMembers.slice(0,10)}
+                            members={activeMembers}
                             environment="STADIUM"
+                            logoGrid={gameState.identity.bandLogo}
+                            logoText={gameState.identity.bandLogoText}
                             tuneType="CADENCE"
                             allowedCategories={['CADENCE']}
                             musicLibrary={gameState.musicLibrary}
@@ -1011,6 +1076,7 @@ export const GameDay: React.FC<GameDayProps> = ({ gameState, onEndGame, setGameS
                      <div className="absolute inset-0 z-50 bg-black animate-fade-in">
                         <RhythmGame 
                             difficulty={'medium'} 
+                            skill={50}
                             onComplete={() => {
                                 if (currentBandIndex < bandsToWatch.length - 1) {
                                     setCurrentBandIndex(prev => prev + 1);
@@ -1019,9 +1085,11 @@ export const GameDay: React.FC<GameDayProps> = ({ gameState, onEndGame, setGameS
                                     setPhase('BATTLE_ACTIVE');
                                 }
                             }} 
-                            uniform={DEFAULT_UNIFORMS[0]} 
-                            members={[]} 
+                            uniform={{ id: 'temp', name: 'Temp', jacketColor: bandsToWatch[currentBandIndex]?.primaryColor || '#000', pantsColor: bandsToWatch[currentBandIndex]?.secondaryColor || '#fff', hatColor: bandsToWatch[currentBandIndex]?.primaryColor || '#000', plumeColor: bandsToWatch[currentBandIndex]?.secondaryColor || '#fff', accentColor: bandsToWatch[currentBandIndex]?.secondaryColor || '#fff', hatStyle: 'shako', jacketStyle: 'classic', pantsStyle: 'regular', isDrumMajor: false }} 
+                            members={Array.from({ length: 20 }, (_, i) => ({ id: i, name: `Member ${i}`, instrument: [InstrumentType.TRUMPET, InstrumentType.TROMBONE, InstrumentType.SNARE, InstrumentType.BASS, InstrumentType.CYMBAL, InstrumentType.TUBA, InstrumentType.MELLOPHONE, InstrumentType.BARITONE, InstrumentType.TENOR_QUADS][Math.floor(Math.random() * 9)], skill: 50, energy: 100, morale: 100, appearance: getRandomAppearance() }))} 
                             environment={'ARENA'}
+                            logoGrid={bandsToWatch[currentBandIndex]?.logo}
+                            logoText={bandsToWatch[currentBandIndex]?.schoolName}
                             inputMode={gameState.settings.inputMode}
                             tuneType={'STAND'}
                             allowedCategories={['HYPE', 'CADENCE', 'CALLOUT']}
@@ -1048,14 +1116,17 @@ export const GameDay: React.FC<GameDayProps> = ({ gameState, onEndGame, setGameS
                      <div className="absolute inset-0 z-50 bg-black animate-fade-in">
                         <RhythmGame 
                             difficulty={'medium'} 
+                            skill={75}
                             onComplete={() => {
                                 setStandBattleState('NONE');
                                 setPhase('RESULTS');
                                 setGameResult(homeScore > awayScore ? 'WIN' : 'LOSS');
                             }} 
-                            uniform={DEFAULT_UNIFORMS[0]} 
-                            members={[]} 
+                            uniform={{ id: 'temp', name: 'Temp', jacketColor: bandsToWatch[0]?.primaryColor || '#000', pantsColor: bandsToWatch[0]?.secondaryColor || '#fff', hatColor: bandsToWatch[0]?.primaryColor || '#000', plumeColor: bandsToWatch[0]?.secondaryColor || '#fff', accentColor: bandsToWatch[0]?.secondaryColor || '#fff', hatStyle: 'shako', jacketStyle: 'classic', pantsStyle: 'regular', isDrumMajor: false }} 
+                            members={Array.from({ length: 20 }, (_, i) => ({ id: i, name: `Member ${i}`, instrument: [InstrumentType.TRUMPET, InstrumentType.TROMBONE, InstrumentType.SNARE, InstrumentType.BASS, InstrumentType.CYMBAL, InstrumentType.TUBA, InstrumentType.MELLOPHONE, InstrumentType.BARITONE, InstrumentType.TENOR_QUADS][Math.floor(Math.random() * 9)], skill: 75, energy: 100, morale: 100, appearance: getRandomAppearance() }))} 
                             environment={'ARENA'}
+                            logoGrid={bandsToWatch[0]?.logo}
+                            logoText={bandsToWatch[0]?.schoolName}
                             inputMode={gameState.settings.inputMode}
                             tuneType={'STAND'}
                             allowedCategories={['HYPE', 'CADENCE', 'CALLOUT']}
@@ -1091,6 +1162,8 @@ export const GameDay: React.FC<GameDayProps> = ({ gameState, onEndGame, setGameS
                             identity={gameState.identity}
                             opponentName={opponentData.identity.schoolName}
                             members={activeMembers}
+                            gameState={gameState}
+                            setGameState={setGameState}
                          />
                      </div>
                  )}
@@ -1101,15 +1174,15 @@ export const GameDay: React.FC<GameDayProps> = ({ gameState, onEndGame, setGameS
                             {[...Array(20)].map((_, i) => <div key={i} className="w-20 h-full bg-yellow-500 opacity-50 shadow-[0_0_10px_yellow]"></div>)}
                         </div>
                         <div className="z-20 flex gap-12 justify-center items-center scale-150">
-                            <BandMemberVisual instrument={InstrumentType.MACE} uniform={dmUniform} appearance={gameState.director.appearance} isPlaying={true} maceConfig={gameState.instrumentDesigns.mace} />
-                            <BandMemberVisual instrument={InstrumentType.SNARE} uniform={gameState.uniforms.find(u => u.id === gameState.currentUniformId) || gameState.uniforms[0]} appearance={getRandomAppearance()} isPlaying={true} instrumentConfig={gameState.instrumentDesigns.percussion} />
+                            <BandMemberVisual instrument={InstrumentType.MACE} uniform={dmUniform} appearance={gameState.director.appearance} isPlaying={true} maceConfig={gameState.instrumentDesigns.mace} bandIdentity={gameState.identity} />
+                            <BandMemberVisual instrument={InstrumentType.SNARE} uniform={gameState.uniforms.find(u => u.id === gameState.currentUniformId) || gameState.uniforms[0]} appearance={getRandomAppearance()} isPlaying={true} instrumentConfig={gameState.instrumentDesigns.percussion} bandIdentity={gameState.identity} />
                         </div>
                     </div>
                  ) : isConcert ? (
                     <div className="w-full h-full bg-[#111] flex items-center justify-center relative">
                         <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_rgba(255,255,255,0.1),_transparent)]"></div>
-                        <div className="grid grid-cols-5 gap-8 scale-110">
-                            {activeMembers.slice(0, 10).map(m => (
+                        <div className="grid gap-4 scale-75" style={{ gridTemplateColumns: `repeat(10, 1fr)` }}>
+                            {activeMembers.slice(0, 50).map(m => (
                                 <BandMemberVisual 
                                     key={m.id} 
                                     instrument={m.instrument} 
@@ -1149,7 +1222,7 @@ export const GameDay: React.FC<GameDayProps> = ({ gameState, onEndGame, setGameS
 
                               {/* Midfield Logo */}
                               <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 rounded-full border-4 border-white flex items-center justify-center opacity-80 overflow-hidden" style={{ backgroundColor: currentEvent.isHome !== false ? gameState.identity.secondaryColor : opponentData.identity.secondaryColor }}>
-                                  <div className="grid grid-cols-10 gap-0 w-24 h-24">
+                                  <div className="grid gap-0 w-24 h-24" style={{ gridTemplateColumns: `repeat(${Math.sqrt((currentEvent.isHome !== false ? gameState.identity.schoolLogo : opponentData.identity.logo)?.length || 100)}, 1fr)` }}>
                                       {(currentEvent.isHome !== false ? gameState.identity.schoolLogo : opponentData.identity.logo)?.map((c, i) => (
                                           <div key={i} style={{ backgroundColor: c }}></div>
                                       ))}
@@ -1241,8 +1314,8 @@ export const GameDay: React.FC<GameDayProps> = ({ gameState, onEndGame, setGameS
 
                          {phase === 'HALFTIME_SHOW' && !isWatchingOpponent && !hasFieldShow && (
                              <div className="absolute inset-0 flex items-center justify-center z-30">
-                                 <div className="grid grid-cols-5 gap-8 animate-pulse">
-                                     {activeMembers.slice(0, 15).map(m => (
+                                 <div className="grid gap-4 animate-pulse scale-75" style={{ gridTemplateColumns: `repeat(10, 1fr)` }}>
+                                     {activeMembers.slice(0, 50).map(m => (
                                          <BandMemberVisual 
                                             key={m.id} 
                                             instrument={m.instrument} 
@@ -1278,13 +1351,16 @@ export const GameDay: React.FC<GameDayProps> = ({ gameState, onEndGame, setGameS
                      <div className="absolute inset-0 z-50 bg-black animate-fade-in">
                         <RhythmGame 
                             difficulty={'medium'} 
+                            skill={(gameState as any).stats?.skill || gameState.career?.skill || 50}
                             onComplete={handleRhythmComplete} 
                             uniform={gameState.uniforms.find(u => u.id === gameState.currentUniformId) || gameState.uniforms[0]} 
                             dmUniform={dmUniform}
                             majoretteUniform={majoretteUniform}
                             guardUniform={guardUniform}
-                            members={activeMembers.slice(0, 10)} 
+                            members={activeMembers} 
                             environment={isConcert ? 'CONCERT' : isParade ? 'PARADE' : 'STADIUM'}
+                            logoGrid={gameState.identity.bandLogo}
+                            logoText={gameState.identity.bandLogoText}
                             inputMode={gameState.settings.inputMode}
                             tuneType={tuneType}
                             activeDrill={tuneType === 'FIELD_SHOW' ? activeDrill : undefined}
@@ -1321,7 +1397,7 @@ export const GameDay: React.FC<GameDayProps> = ({ gameState, onEndGame, setGameS
                      )}
                      
                      <Button 
-                        onClick={startShow} 
+                        onClick={() => { console.log("Button clicked"); startShow(); }} 
                         disabled={isPlayingTune || battlePhase === 'OPPONENT' || isWatchingOpponent || phase === 'BATTLE_ACTIVE'} 
                         className={`h-full flex-grow text-sm border-2 ${isGame && phase !== 'HALFTIME_SHOW' ? 'bg-blue-900 border-blue-500 hover:bg-blue-800' : 'bg-red-700 border-red-500 hover:bg-red-600'}`}
                      >

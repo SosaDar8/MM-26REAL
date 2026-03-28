@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Button } from './Button';
-import { FORMER_DIRECTORS, FIRING_REASONS, containsProfanity, ASSISTANT_NAMES } from '../constants';
+import { FORMER_DIRECTORS, FIRING_REASONS, containsProfanity, ASSISTANT_NAMES, RECRUIT_SURNAMES } from '../constants';
 
 interface BoardMeetingProps {
     onComplete: (directorName: string, loyaltyMod: number, wantsTutorial: boolean, difficulty: 'NORMAL' | 'HARD' | 'HACKER', assistantName: string) => void;
@@ -123,15 +123,23 @@ export const BoardMeeting: React.FC<BoardMeetingProps> = ({ onComplete }) => {
                 {currentLine.isInput ? (
                     <div className="flex flex-col gap-4">
                         <p className="text-white text-lg">{currentLine.text}</p>
-                        <input 
-                            type="text" 
-                            autoFocus
-                            value={directorName}
-                            onChange={(e) => setDirectorName(e.target.value)}
-                            placeholder="Enter Name (e.g. Smith)"
-                            className="bg-black border-2 border-white p-2 text-white text-xl font-bold uppercase w-full"
-                            onKeyDown={(e) => e.key === 'Enter' && directorName && handleNext()}
-                        />
+                        <div className="flex gap-2">
+                            <input 
+                                type="text" 
+                                autoFocus
+                                value={directorName}
+                                onChange={(e) => setDirectorName(e.target.value)}
+                                placeholder="Enter Name (e.g. Smith)"
+                                className="bg-black border-2 border-white p-2 text-white text-xl font-bold uppercase w-full"
+                                onKeyDown={(e) => e.key === 'Enter' && directorName && handleNext()}
+                            />
+                            <Button 
+                                onClick={() => setDirectorName(RECRUIT_SURNAMES[Math.floor(Math.random() * RECRUIT_SURNAMES.length)])}
+                                className="bg-purple-600 hover:bg-purple-500 border-purple-400 whitespace-nowrap"
+                            >
+                                🎲 RANDOMIZE
+                            </Button>
+                        </div>
                         {errorMsg && <p className="text-red-400 font-bold animate-pulse">{errorMsg}</p>}
                         <div className="flex justify-end">
                             <Button onClick={handleNext} disabled={!directorName}>CONFIRM IDENTITY</Button>

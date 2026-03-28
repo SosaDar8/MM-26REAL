@@ -158,7 +158,8 @@ export const InstrumentDesigner: React.FC<InstrumentDesignerProps> = ({ gameStat
                         appearance={{ skinColor: '#8d5524', hairColor: '#000', hairStyle: 1, bodyType: 'average', accessoryId: 0 }}
                         instrumentConfig={activeTab === 'BRASS' ? brassDesign : percDesign}
                         maceConfig={maceDesign}
-                        logoGrid={gameState.identity.logo}
+                        logoGrid={gameState.identity.bandLogo}
+                        logoText={gameState.identity.bandLogoText}
                         scale={1.5}
                         isPlaying={true}
                     />

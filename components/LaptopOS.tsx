@@ -41,6 +41,9 @@ export const LaptopOS: React.FC<LaptopOSProps> = ({ gameState, onClose, onSaveTr
         const [selectedCategory, setSelectedCategory] = useState<SongCategory>('HYPE');
         const [chantLyrics, setChantLyrics] = useState("");
         const [showImport, setShowImport] = useState(false);
+        const [pendingImport, setPendingImport] = useState<{file: File, dataUrl: string} | null>(null);
+        const [importTitle, setImportTitle] = useState("");
+        const [importCategory, setImportCategory] = useState<SongCategory>('SHOW');
         const seqInterval = useRef<any>(null);
 
         // Sequence Playback Logic
@@ -92,6 +95,23 @@ export const LaptopOS: React.FC<LaptopOSProps> = ({ gameState, onClose, onSaveTr
             };
             onSaveTrack(newTrack);
             alert(`"${trackName}" ready for field use!`);
+        };
+
+        const confirmImport = () => {
+            if (!pendingImport) return;
+            const newTrack: MusicTrack = {
+                id: `custom-audio-${Date.now()}`,
+                title: importTitle || "Untitled",
+                artist: gameState.director.name,
+                bpm: 120,
+                duration: "Audio File",
+                isCustom: true,
+                category: importCategory,
+                audioUrl: pendingImport.dataUrl
+            };
+            onSaveTrack(newTrack);
+            setPendingImport(null);
+            setShowImport(false);
         };
 
         const handleImport = (track: MusicTrack) => {
@@ -247,6 +267,41 @@ export const LaptopOS: React.FC<LaptopOSProps> = ({ gameState, onClose, onSaveTr
 
         return (
             <div className="w-full h-full bg-[#111] flex flex-col text-gray-300 font-sans relative">
+                {pendingImport && (
+                    <div className="absolute inset-0 z-[200] bg-black/90 flex items-center justify-center p-8">
+                        <div className="bg-gray-900 border-2 border-orange-500 p-6 w-full max-w-md shadow-2xl">
+                            <h3 className="text-xl font-black text-orange-400 mb-4 uppercase tracking-widest">Import Audio File</h3>
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block">Track Title</label>
+                                    <input 
+                                        type="text" 
+                                        value={importTitle}
+                                        onChange={(e) => setImportTitle(e.target.value)}
+                                        className="w-full bg-black border border-gray-700 text-white p-2 text-sm focus:border-orange-500 outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block">Song Category</label>
+                                    <select 
+                                        value={importCategory}
+                                        onChange={(e) => setImportCategory(e.target.value as SongCategory)}
+                                        className="w-full bg-black border border-gray-700 text-white p-2 text-sm focus:border-orange-500 outline-none"
+                                    >
+                                        <option value="HYPE">FIELD HYPE</option>
+                                        <option value="CADENCE">PERCUSSION CADENCE</option>
+                                        <option value="CALLOUT">FAN CALLOUT</option>
+                                        <option value="SHOW">SHOW STOPPER</option>
+                                    </select>
+                                </div>
+                                <div className="flex gap-4 pt-4">
+                                    <Button onClick={() => setPendingImport(null)} variant="secondary" className="flex-1">CANCEL</Button>
+                                    <Button onClick={confirmImport} className="flex-1 bg-orange-600 hover:bg-orange-500 text-black border-orange-400">SAVE TRACK</Button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
                 {showImport && (
                     <div className="absolute inset-0 z-[100] bg-black/95 flex flex-col items-center justify-center p-12">
                         <h3 className="text-3xl font-black text-white mb-8 uppercase tracking-tighter italic">LOAD PROJECT DATA</h3>
@@ -266,7 +321,7 @@ export const LaptopOS: React.FC<LaptopOSProps> = ({ gameState, onClose, onSaveTr
                                 IMPORT AUDIO FROM COMPUTER
                                 <input 
                                     type="file" 
-                                    accept="audio/*" 
+                                    accept="*/*" 
                                     className="hidden" 
                                     onChange={(e) => {
                                         const file = e.target.files?.[0];
@@ -274,19 +329,9 @@ export const LaptopOS: React.FC<LaptopOSProps> = ({ gameState, onClose, onSaveTr
                                             const reader = new FileReader();
                                             reader.onload = (event) => {
                                                 const audioUrl = event.target?.result as string;
-                                                const newTrack: MusicTrack = {
-                                                    id: `custom-audio-${Date.now()}`,
-                                                    title: file.name.replace(/\.[^/.]+$/, ""),
-                                                    artist: gameState.director.name,
-                                                    bpm: 120,
-                                                    duration: "Audio File",
-                                                    isCustom: true,
-                                                    category: 'SHOW',
-                                                    audioUrl: audioUrl
-                                                };
-                                                onSaveTrack(newTrack);
-                                                alert(`Successfully imported ${file.name}! It is now in your Music Library.`);
-                                                setShowImport(false);
+                                                setPendingImport({ file, dataUrl: audioUrl });
+                                                setImportTitle(file.name.replace(/\.[^/.]+$/, ""));
+                                                setImportCategory('SHOW');
                                             };
                                             reader.readAsDataURL(file);
                                         }
@@ -407,6 +452,9 @@ export const LaptopOS: React.FC<LaptopOSProps> = ({ gameState, onClose, onSaveTr
     // --- MUSIC LIBRARY APP ---
     const MusicLibApp = () => {
         const [playingId, setPlayingId] = useState<string | null>(null);
+        const [pendingImport, setPendingImport] = useState<{file: File, url: string} | null>(null);
+        const [importTitle, setImportTitle] = useState("");
+        const [importCategory, setImportCategory] = useState<SongCategory>('HYPE');
         const fileInputRef = useRef<HTMLInputElement>(null);
 
         const togglePlay = (track: MusicTrack) => {
@@ -436,22 +484,65 @@ export const LaptopOS: React.FC<LaptopOSProps> = ({ gameState, onClose, onSaveTr
             const file = e.target.files?.[0];
             if (file) {
                 const url = URL.createObjectURL(file);
-                const newTrack: MusicTrack = {
-                    id: `local-${Date.now()}`,
-                    title: file.name.replace(/\.[^/.]+$/, ""), // remove extension
-                    artist: 'Imported',
-                    bpm: 120, // Default for imported audio
-                    isCustom: true,
-                    duration: 'Unknown',
-                    category: 'HYPE',
-                    audioUrl: url
-                };
-                onSaveTrack(newTrack);
+                setPendingImport({ file, url });
+                setImportTitle(file.name.replace(/\.[^/.]+$/, ""));
+                setImportCategory('HYPE');
             }
         };
 
+        const confirmImport = () => {
+            if (!pendingImport) return;
+            const newTrack: MusicTrack = {
+                id: `local-${Date.now()}`,
+                title: importTitle || "Untitled",
+                artist: 'Imported',
+                bpm: 120, // Default for imported audio
+                isCustom: true,
+                duration: 'Unknown',
+                category: importCategory,
+                audioUrl: pendingImport.url
+            };
+            onSaveTrack(newTrack);
+            setPendingImport(null);
+        };
+
         return (
-            <div className="w-full h-full bg-[#121212] flex flex-col font-sans text-white">
+            <div className="w-full h-full bg-[#121212] flex flex-col font-sans text-white relative">
+                {pendingImport && (
+                    <div className="absolute inset-0 z-50 bg-black/90 flex items-center justify-center p-8">
+                        <div className="bg-gray-900 border-2 border-green-500 p-6 w-full max-w-md shadow-2xl">
+                            <h3 className="text-xl font-black text-green-400 mb-4 uppercase tracking-widest">Import Audio File</h3>
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block">Track Title</label>
+                                    <input 
+                                        type="text" 
+                                        value={importTitle}
+                                        onChange={(e) => setImportTitle(e.target.value)}
+                                        className="w-full bg-black border border-gray-700 text-white p-2 text-sm focus:border-green-500 outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block">Song Category</label>
+                                    <select 
+                                        value={importCategory}
+                                        onChange={(e) => setImportCategory(e.target.value as SongCategory)}
+                                        className="w-full bg-black border border-gray-700 text-white p-2 text-sm focus:border-green-500 outline-none"
+                                    >
+                                        <option value="HYPE">FIELD HYPE</option>
+                                        <option value="CADENCE">PERCUSSION CADENCE</option>
+                                        <option value="CALLOUT">FAN CALLOUT</option>
+                                        <option value="SHOW">SHOW STOPPER</option>
+                                    </select>
+                                </div>
+                                <div className="flex gap-4 pt-4">
+                                    <Button onClick={() => setPendingImport(null)} variant="secondary" className="flex-1">CANCEL</Button>
+                                    <Button onClick={confirmImport} className="flex-1 bg-green-600 hover:bg-green-500 text-black border-green-400">SAVE TRACK</Button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
                 <div className="bg-[#27272a] p-3 flex justify-between items-center border-b border-black">
                     <div className="flex items-center gap-2">
                         <span className="text-xl">📻</span>
@@ -463,7 +554,7 @@ export const LaptopOS: React.FC<LaptopOSProps> = ({ gameState, onClose, onSaveTr
                 <div className="bg-black p-3 border-b border-gray-800 flex justify-end">
                     <input 
                         type="file" 
-                        accept="audio/*" 
+                        accept="*/*" 
                         className="hidden" 
                         ref={fileInputRef}
                         onChange={handleFileUpload}
@@ -781,41 +872,41 @@ export const LaptopOS: React.FC<LaptopOSProps> = ({ gameState, onClose, onSaveTr
 
                     {/* Desktop Icons */}
                     {activeApp === 'DESKTOP' && (
-                        <div className="p-8 grid grid-cols-1 grid-rows-7 gap-8 w-28">
-                            <div className="flex flex-col items-center gap-1 cursor-pointer group" onClick={() => setActiveApp('FUSECORE')}>
+                        <div className="p-8 flex flex-row flex-wrap gap-8 h-[calc(100%-3rem)] content-start overflow-y-auto">
+                            <div className="flex flex-col items-center gap-1 cursor-pointer group w-20" onClick={() => setActiveApp('FUSECORE')}>
                                 <div className="w-14 h-14 bg-orange-600 border-4 border-white flex items-center justify-center text-3xl shadow-[4px_4px_0_rgba(0,0,0,0.4)] group-hover:scale-110 group-hover:rotate-3 transition-all">🎹</div>
-                                <span className="text-white text-[10px] font-black uppercase tracking-tighter drop-shadow-md bg-black/40 px-2 py-0.5 rounded-full">FuseCore</span>
+                                <span className="text-white text-[10px] font-black uppercase tracking-tighter drop-shadow-md bg-black/40 px-2 py-0.5 rounded-full text-center">FuseCore</span>
                             </div>
-                            <div className="flex flex-col items-center gap-1 cursor-pointer group" onClick={() => setActiveApp('MUSIC_LIB')}>
+                            <div className="flex flex-col items-center gap-1 cursor-pointer group w-20" onClick={() => setActiveApp('MUSIC_LIB')}>
                                 <div className="w-14 h-14 bg-purple-600 border-4 border-white flex items-center justify-center text-3xl shadow-[4px_4px_0_rgba(0,0,0,0.4)] group-hover:scale-110 group-hover:-rotate-3 transition-all">🎧</div>
-                                <span className="text-white text-[10px] font-black uppercase tracking-tighter drop-shadow-md bg-black/40 px-2 py-0.5 rounded-full">GrooveBox</span>
+                                <span className="text-white text-[10px] font-black uppercase tracking-tighter drop-shadow-md bg-black/40 px-2 py-0.5 rounded-full text-center">GrooveBox</span>
                             </div>
-                            <div className="flex flex-col items-center gap-1 cursor-pointer group" onClick={() => setActiveApp('BROWSER')}>
+                            <div className="flex flex-col items-center gap-1 cursor-pointer group w-20" onClick={() => setActiveApp('BROWSER')}>
                                 <div className="w-14 h-14 bg-blue-600 border-4 border-white flex items-center justify-center text-3xl shadow-[4px_4px_0_rgba(0,0,0,0.4)] group-hover:scale-110 group-hover:rotate-3 transition-all">🌍</div>
-                                <span className="text-white text-[10px] font-black uppercase tracking-tighter drop-shadow-md bg-black/40 px-2 py-0.5 rounded-full">NetSurfer</span>
+                                <span className="text-white text-[10px] font-black uppercase tracking-tighter drop-shadow-md bg-black/40 px-2 py-0.5 rounded-full text-center">NetSurfer</span>
                             </div>
-                            <div className="flex flex-col items-center gap-1 cursor-pointer group" onClick={() => setActiveApp('FILES')}>
+                            <div className="flex flex-col items-center gap-1 cursor-pointer group w-20" onClick={() => setActiveApp('FILES')}>
                                 <div className="w-14 h-14 bg-yellow-500 border-4 border-white flex items-center justify-center text-3xl shadow-[4px_4px_0_rgba(0,0,0,0.4)] group-hover:scale-110 group-hover:rotate-3 transition-all">📂</div>
-                                <span className="text-white text-[10px] font-black uppercase tracking-tighter drop-shadow-md bg-black/40 px-2 py-0.5 rounded-full">MyFiles</span>
+                                <span className="text-white text-[10px] font-black uppercase tracking-tighter drop-shadow-md bg-black/40 px-2 py-0.5 rounded-full text-center">MyFiles</span>
                             </div>
-                            <div className="flex flex-col items-center gap-1 cursor-pointer group" onClick={() => setActiveApp('ROSTER')}>
+                            <div className="flex flex-col items-center gap-1 cursor-pointer group w-20" onClick={() => setActiveApp('ROSTER')}>
                                 <div className="w-14 h-14 bg-green-700 border-4 border-white flex items-center justify-center text-3xl shadow-[4px_4px_0_rgba(0,0,0,0.4)] group-hover:scale-110 group-hover:rotate-3 transition-all">📇</div>
-                                <span className="text-white text-[10px] font-black uppercase tracking-tighter drop-shadow-md bg-black/40 px-2 py-0.5 rounded-full">RosterMgr</span>
+                                <span className="text-white text-[10px] font-black uppercase tracking-tighter drop-shadow-md bg-black/40 px-2 py-0.5 rounded-full text-center">RosterMgr</span>
                             </div>
-                            <div className="flex flex-col items-center gap-1 cursor-pointer group" onClick={() => setActiveApp('FINANCE')}>
+                            <div className="flex flex-col items-center gap-1 cursor-pointer group w-20" onClick={() => setActiveApp('FINANCE')}>
                                 <div className="w-14 h-14 bg-emerald-900 border-4 border-white flex items-center justify-center text-3xl shadow-[4px_4px_0_rgba(0,0,0,0.4)] group-hover:scale-110 transition-all">💸</div>
-                                <span className="text-white text-[10px] font-black uppercase tracking-tighter drop-shadow-md bg-black/40 px-2 py-0.5 rounded-full">Finance</span>
+                                <span className="text-white text-[10px] font-black uppercase tracking-tighter drop-shadow-md bg-black/40 px-2 py-0.5 rounded-full text-center">Finance</span>
                             </div>
-                            <div className="flex flex-col items-center gap-1 cursor-pointer group" onClick={() => setActiveApp('RECRUIT')}>
+                            <div className="flex flex-col items-center gap-1 cursor-pointer group w-20" onClick={() => setActiveApp('RECRUIT')}>
                                 <div className="w-14 h-14 bg-indigo-600 border-4 border-white flex items-center justify-center text-3xl shadow-[4px_4px_0_rgba(0,0,0,0.4)] group-hover:scale-110 transition-all">🔭</div>
-                                <span className="text-white text-[10px] font-black uppercase tracking-tighter drop-shadow-md bg-black/40 px-2 py-0.5 rounded-full">ScoutHub</span>
+                                <span className="text-white text-[10px] font-black uppercase tracking-tighter drop-shadow-md bg-black/40 px-2 py-0.5 rounded-full text-center">ScoutHub</span>
                             </div>
                         </div>
                     )}
 
                     {/* Active App Window Container */}
                     {activeApp !== 'DESKTOP' && (
-                        <div className="absolute inset-4 bottom-14 border-4 border-white shadow-[15px_15px_30px_rgba(0,0,0,0.6)] bg-white animate-fade-in overflow-hidden rounded-sm">
+                        <div className="absolute inset-4 bottom-14 border-4 border-white shadow-[15px_15px_30px_rgba(0,0,0,0.6)] bg-white animate-fade-in overflow-y-auto rounded-sm">
                             {activeApp === 'FUSECORE' && <FuseCore />}
                             {activeApp === 'MUSIC_LIB' && <MusicLibApp />}
                             {activeApp === 'BROWSER' && <Browser />}

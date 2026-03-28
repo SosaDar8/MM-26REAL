@@ -301,7 +301,13 @@ export const VideoApp: React.FC<VideoAppProps> = ({ gameState, onBack }) => {
                     <div className="flex gap-4 text-sm font-bold">
                         <button onClick={() => setView('FEED')} className={view === 'FEED' ? 'text-white' : 'text-gray-500'}>Home</button>
                         <button onClick={() => setView('CHANNEL')} className={view === 'CHANNEL' ? 'text-white' : 'text-gray-500'}>My Channel</button>
-                        <button onClick={() => setView('UPLOAD')} className="text-red-500">+ Upload</button>
+                        <button onClick={() => {
+                            if (gameState.clips > 0) {
+                                setView('UPLOAD');
+                            } else {
+                                alert("You need a Band Clip to upload a video! Go to Staff Duties in the Band Office to record one.");
+                            }
+                        }} className="text-red-500">+ Upload ({gameState.clips || 0} Clips)</button>
                         <Button onClick={onBack} variant="secondary" className="text-[10px] py-1 px-2 h-auto">EXIT</Button>
                     </div>
                 </header>
@@ -379,7 +385,13 @@ export const VideoApp: React.FC<VideoAppProps> = ({ gameState, onBack }) => {
                             {myVideos.length === 0 ? (
                                 <div className="text-center text-gray-500 py-10">
                                     <p>No videos uploaded yet.</p>
-                                    <button onClick={() => setView('UPLOAD')} className="text-blue-400 text-sm mt-2">Upload your first video!</button>
+                                    <button onClick={() => {
+                                        if (gameState.clips > 0) {
+                                            setView('UPLOAD');
+                                        } else {
+                                            alert("You need a Band Clip to upload a video! Go to Staff Duties in the Band Office to record one.");
+                                        }
+                                    }} className="text-blue-400 text-sm mt-2">Upload your first video!</button>
                                 </div>
                             ) : (
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

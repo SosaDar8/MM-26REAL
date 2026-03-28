@@ -216,9 +216,9 @@ export const FactoryMode: React.FC<FactoryModeProps> = ({ onSave, onClose }) => 
         pantsColor: '#333',
         hatColor: '#333',
         plumeColor: '#fff',
-        hatStyle: activeType === 'HAT' ? previewAssetId : 'none',
-        jacketStyle: activeType === 'JACKET' ? previewAssetId : 'tshirt',
-        pantsStyle: activeType === 'PANTS' ? previewAssetId : 'regular',
+        hatStyle: (activeType === 'HAT' ? previewAssetId : 'none') as any,
+        jacketStyle: (activeType === 'JACKET' ? previewAssetId : 'tshirt') as any,
+        pantsStyle: (activeType === 'PANTS' ? previewAssetId : 'regular') as any,
         // For accessories, we need to handle them via appearance or uniform if supported
     };
 

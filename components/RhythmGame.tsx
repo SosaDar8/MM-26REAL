@@ -26,6 +26,7 @@ interface RhythmGameProps {
   allowedCategories?: SongCategory[];
   musicLibrary?: MusicTrack[];
   autoPlay?: boolean;
+  skill?: number; // Band skill level (0-100)
 }
 
 interface HitFeedback {
@@ -53,9 +54,14 @@ export const RhythmGame: React.FC<RhythmGameProps> = ({
     allowedCategories,
     musicLibrary,
     autoPlay = false,
+    skill = 50,
     activeDrill,
     drillFrameIndex
 }) => {
+    useEffect(() => {
+        console.log("RhythmGame instrumentDesigns:", instrumentDesigns);
+    }, [instrumentDesigns]);
+
     // Game State
     const [gameState, setGameState] = useState<'SELECT' | 'PLAYING'>('SELECT');
     const [selectedCategory, setSelectedCategory] = useState<SongCategory>(allowedCategories ? allowedCategories[0] : 'HYPE');
@@ -74,6 +80,10 @@ export const RhythmGame: React.FC<RhythmGameProps> = ({
     const [perfectBurst, setPerfectBurst] = useState<{x: number, y: number, id: number}[]>([]);
     const [isCranking, setIsCranking] = useState(false);
     const [crankMeter, setCrankMeter] = useState(0);
+    const [isPaused, setIsPaused] = useState(false);
+
+    // Touch tracking for swipes
+    const touchStartRef = useRef<{ [lane: number]: { x: number, y: number } }>({});
 
     const crankMeterRef = useRef(0);
     const isCrankingRef = useRef(false);
@@ -90,8 +100,26 @@ export const RhythmGame: React.FC<RhythmGameProps> = ({
     const [totalNotes, setTotalNotes] = useState(0);
     const [hitNotes, setHitNotes] = useState(0);
     
+    // Dynamic Audio based on Skill
+    useEffect(() => {
+        if (gameState !== 'PLAYING' || isPaused) return;
+        
+        const interval = setInterval(() => {
+            // Lower skill = higher chance of messing up
+            const messUpChance = Math.max(0, (100 - skill) / 100);
+            
+            if (Math.random() < messUpChance * 0.5) { // Max 50% chance every 2 seconds
+                soundManager.setMessedUp(true);
+                setTimeout(() => {
+                    soundManager.setMessedUp(false);
+                }, 1000 + Math.random() * 2000); // Mess up for 1-3 seconds
+            }
+        }, 2000);
+        
+        return () => clearInterval(interval);
+    }, [gameState, isPaused, skill]);
+
     // Pause & Autopilot
-    const [isPaused, setIsPaused] = useState(false);
     const [isAutopilotState, setIsAutopilotState] = useState(autoPlay);
     const isAutopilotRef = useRef(autoPlay);
 
@@ -108,6 +136,7 @@ export const RhythmGame: React.FC<RhythmGameProps> = ({
 
     // Audio Ref
     const audioRef = useRef<HTMLAudioElement | null>(null);
+    const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
     // Refs
     const requestRef = useRef<number>(0);
@@ -127,16 +156,10 @@ export const RhythmGame: React.FC<RhythmGameProps> = ({
 
     // Use passed library or fallback to initial tracks
     const availableTracks = musicLibrary || INITIAL_TRACKS;
+    const availableCategories = allowedCategories || ['HYPE', 'CADENCE', 'CALLOUT', 'CHANT'];
 
     const visibleMembers = useMemo(() => {
-        if (!members || members.length === 0) {
-             return [1,2,3,4].map(i => ({
-                id: `mock-${i}`,
-                instrument: InstrumentType.SNARE,
-                appearance: { skinColor: '#dca586', hairColor: '#000', hairStyle: 1, bodyType: 'average', accessoryId: 0 }
-            } as BandMember));
-        }
-        return members; 
+        return members || [];
     }, [members]);
 
     const getInstrumentConfig = (instr: InstrumentType): InstrumentDesign | undefined => {
@@ -184,6 +207,16 @@ export const RhythmGame: React.FC<RhythmGameProps> = ({
 
     // Initialize Game Loop
     useEffect(() => {
+        if (autoPlay && gameState === 'SELECT') {
+            const available = availableTracks.filter(t => availableCategories.includes(t.category));
+            if (available.length > 0) {
+                startGame(available[Math.floor(Math.random() * available.length)]);
+            } else {
+                startGame();
+            }
+            return;
+        }
+
         if (gameState !== 'PLAYING') return;
 
         requestRef.current = requestAnimationFrame(gameLoop);
@@ -273,12 +306,30 @@ export const RhythmGame: React.FC<RhythmGameProps> = ({
     }, [isCranking]);
 
     const spawnNote = (targetTime: number, lane: number) => {
+        let type: 'TAP' | 'HOLD' | 'SWIPE' = 'TAP';
+        let duration = 0;
+        let swipeDirection: 'UP' | 'DOWN' | 'LEFT' | 'RIGHT' | undefined;
+
+        const rand = Math.random();
+        if (difficulty !== 'easy') {
+            if (rand > 0.85) {
+                type = 'HOLD';
+                duration = 500 + Math.random() * 1000; // 0.5s to 1.5s hold
+            } else if (rand > 0.7) {
+                type = 'SWIPE';
+                const dirs: ('UP' | 'DOWN' | 'LEFT' | 'RIGHT')[] = ['UP', 'DOWN', 'LEFT', 'RIGHT'];
+                swipeDirection = dirs[Math.floor(Math.random() * dirs.length)];
+            }
+        }
+
         const newNote: RhythmNote = {
             id: `n-${Date.now()}-${Math.random()}`,
             lane,
             timestamp: targetTime,
             hit: false,
-            type: 'TAP'
+            type,
+            duration,
+            swipeDirection
         };
         setNotes(prev => [...prev, newNote]);
     };
@@ -311,21 +362,114 @@ export const RhythmGame: React.FC<RhythmGameProps> = ({
             const newNotes = prevNotes.map(n => {
                 if (isAutopilotRef.current && !n.hit && currentTime >= n.timestamp - 20) {
                     // Autopilot hits it before it can be missed
-                    setTimeout(() => handleHit(n.lane, true), 0);
+                    setTimeout(() => handleHit(n.lane, true, n.type === 'SWIPE' ? n.swipeDirection : undefined), 0);
                     return { ...n, hit: true }; // Mark as hit so we don't process it again
                 }
                 return n;
             }).filter(n => {
+                if (n.hit && n.type === 'HOLD' && n.duration) {
+                    return currentTime < n.timestamp + n.duration;
+                }
                 if (!n.hit && n.timestamp < currentTime - 150) {
                     missedCount++;
                     return false;
                 }
-                return true;
+                return !n.hit; // Remove TAP and SWIPE notes once hit
             });
 
             if (missedCount > 0) {
                 // Defer handleMiss to avoid setting state during render/setNotes
                 setTimeout(() => handleMiss(missedCount), 0);
+            }
+            
+            // --- CANVAS RENDERING ---
+            if (canvasRef.current) {
+                const ctx = canvasRef.current.getContext('2d');
+                if (ctx) {
+                    const width = canvasRef.current.width;
+                    const height = canvasRef.current.height;
+                    ctx.clearRect(0, 0, width, height);
+
+                    const laneColorsHex = ['#00ff00', '#ff0000', '#ffff00', '#0000ff'];
+
+                    newNotes.forEach(note => {
+                        const timeUntilHit = note.timestamp - currentTime;
+                        const progress = 1 - (timeUntilHit / 1500);
+                        
+                        if (progress >= -1 && progress <= 1.1 && !note.hit) {
+                            const laneWidth = width / 4;
+                            const x = (note.lane * laneWidth) + (laneWidth / 2);
+                            const y = progress * (height * 0.9); // 90% is the hit zone
+                            
+                            const size = 30 + (progress * 40);
+                            
+                            ctx.save();
+                            
+                            // Draw HOLD trail
+                            if (note.type === 'HOLD' && note.duration) {
+                                const endProgress = 1 - ((timeUntilHit - note.duration) / 1500);
+                                const endY = endProgress * (height * 0.9);
+                                
+                                ctx.fillStyle = laneColorsHex[note.lane];
+                                ctx.globalAlpha = 0.5;
+                                ctx.fillRect(x - size/4, endY, size/2, y - endY);
+                                ctx.globalAlpha = 1.0;
+                            }
+
+                            ctx.translate(x, y);
+                            
+                            if (note.type === 'SWIPE') {
+                                // Draw Swipe Arrow
+                                ctx.shadowBlur = 15;
+                                ctx.shadowColor = laneColorsHex[note.lane];
+                                ctx.fillStyle = laneColorsHex[note.lane];
+                                
+                                ctx.beginPath();
+                                if (note.swipeDirection === 'UP') {
+                                    ctx.moveTo(0, -size/2); ctx.lineTo(size/2, size/2); ctx.lineTo(-size/2, size/2);
+                                } else if (note.swipeDirection === 'DOWN') {
+                                    ctx.moveTo(0, size/2); ctx.lineTo(size/2, -size/2); ctx.lineTo(-size/2, -size/2);
+                                } else if (note.swipeDirection === 'LEFT') {
+                                    ctx.moveTo(-size/2, 0); ctx.lineTo(size/2, -size/2); ctx.lineTo(size/2, size/2);
+                                } else if (note.swipeDirection === 'RIGHT') {
+                                    ctx.moveTo(size/2, 0); ctx.lineTo(-size/2, -size/2); ctx.lineTo(-size/2, size/2);
+                                } else {
+                                    ctx.arc(0, 0, size/2, 0, Math.PI * 2);
+                                }
+                                ctx.fill();
+                                ctx.closePath();
+                            } else {
+                                // Draw Normal/Hold Note Head
+                                ctx.rotate(Math.PI / 4); // 45 degrees
+                                
+                                // Glow effect
+                                ctx.shadowBlur = 15;
+                                ctx.shadowColor = laneColorsHex[note.lane];
+                                
+                                // Brightness boost near hit zone
+                                if (progress > 0.85 && progress < 1.05) {
+                                    ctx.fillStyle = '#ffffff';
+                                } else {
+                                    ctx.fillStyle = laneColorsHex[note.lane];
+                                }
+                                
+                                ctx.fillRect(-size/2, -size/2, size, size);
+                                
+                                // Inner border
+                                ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+                                ctx.lineWidth = 2;
+                                ctx.strokeRect(-size/2 + 4, -size/2 + 4, size - 8, size - 8);
+                                
+                                // Outer border
+                                ctx.strokeStyle = '#ffffff';
+                                ctx.lineWidth = 2;
+                                ctx.strokeRect(-size/2, -size/2, size, size);
+                            }
+                            
+                            ctx.restore();
+                        }
+                    });
+                }
             }
 
             return newNotes;
@@ -404,7 +548,7 @@ export const RhythmGame: React.FC<RhythmGameProps> = ({
         }, 100);
     };
 
-    const handleHit = (lane: number, isAutomated = false) => {
+    const handleHit = (lane: number, isAutomated = false, swipeDirection?: 'UP' | 'DOWN' | 'LEFT' | 'RIGHT') => {
         if (isPaused) return;
 
         const currentTime = Date.now() - startTimeRef.current - totalPauseDurationRef.current;
@@ -414,7 +558,8 @@ export const RhythmGame: React.FC<RhythmGameProps> = ({
             const noteIndex = prev.findIndex(n => 
                 !n.hit && 
                 n.lane === lane && 
-                Math.abs(n.timestamp - currentTime) < 150
+                (isAutomated || Math.abs(n.timestamp - currentTime) < 150) &&
+                (n.type !== 'SWIPE' || n.swipeDirection === swipeDirection || isAutomated || inputMode === 'PC')
             );
 
             if (noteIndex !== -1) {
@@ -459,7 +604,7 @@ export const RhythmGame: React.FC<RhythmGameProps> = ({
                 else soundManager.playClick();
 
                 const newNotes = [...prev];
-                newNotes.splice(noteIndex, 1); 
+                newNotes[noteIndex] = { ...note, hit: true };
                 return newNotes;
             }
             return prev;
@@ -516,11 +661,9 @@ export const RhythmGame: React.FC<RhythmGameProps> = ({
             case 'PARADE': return "bg-gray-800";
             case 'CONCERT': return "bg-[#1a0505]";
             case 'ARENA': return "bg-yellow-900";
-            case 'STADIUM': default: return "bg-green-900";
+            case 'STADIUM': default: return "bg-gray-400 bg-[url('https://www.transparenttextures.com/patterns/concrete-wall.png')]";
         }
     };
-
-    const availableCategories = allowedCategories || ['HYPE', 'CADENCE', 'CALLOUT', 'CHANT'];
 
     if (gameState === 'SELECT') {
         return (
@@ -610,8 +753,55 @@ export const RhythmGame: React.FC<RhythmGameProps> = ({
                             <div 
                                 key={i} 
                                 className={`flex-1 relative border-r border-white/10 ${activeLanes[i] ? 'lane-flash-anim' : ''} ${inputMode === 'MOBILE' ? 'cursor-pointer active:bg-white/20' : ''}`}
-                                onTouchStart={(e) => { e.preventDefault(); handleHit(i); }}
-                                onMouseDown={() => inputMode === 'MOBILE' && handleHit(i)} 
+                                onTouchStart={(e) => { 
+                                    e.preventDefault(); 
+                                    touchStartRef.current[i] = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+                                    handleHit(i); // Try as TAP first
+                                }}
+                                onTouchEnd={(e) => {
+                                    e.preventDefault();
+                                    const start = touchStartRef.current[i];
+                                    if (start && e.changedTouches.length > 0) {
+                                        const end = { x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY };
+                                        const dx = end.x - start.x;
+                                        const dy = end.y - start.y;
+                                        if (Math.abs(dx) > 30 || Math.abs(dy) > 30) {
+                                            let dir: 'UP' | 'DOWN' | 'LEFT' | 'RIGHT';
+                                            if (Math.abs(dx) > Math.abs(dy)) {
+                                                dir = dx > 0 ? 'RIGHT' : 'LEFT';
+                                            } else {
+                                                dir = dy > 0 ? 'DOWN' : 'UP';
+                                            }
+                                            handleHit(i, false, dir);
+                                        }
+                                    }
+                                    delete touchStartRef.current[i];
+                                }}
+                                onMouseDown={(e) => {
+                                    if (inputMode === 'MOBILE') {
+                                        touchStartRef.current[i] = { x: e.clientX, y: e.clientY };
+                                        handleHit(i);
+                                    }
+                                }} 
+                                onMouseUp={(e) => {
+                                    if (inputMode === 'MOBILE') {
+                                        const start = touchStartRef.current[i];
+                                        if (start) {
+                                            const dx = e.clientX - start.x;
+                                            const dy = e.clientY - start.y;
+                                            if (Math.abs(dx) > 30 || Math.abs(dy) > 30) {
+                                                let dir: 'UP' | 'DOWN' | 'LEFT' | 'RIGHT';
+                                                if (Math.abs(dx) > Math.abs(dy)) {
+                                                    dir = dx > 0 ? 'RIGHT' : 'LEFT';
+                                                } else {
+                                                    dir = dy > 0 ? 'DOWN' : 'UP';
+                                                }
+                                                handleHit(i, false, dir);
+                                            }
+                                        }
+                                        delete touchStartRef.current[i];
+                                    }
+                                }}
                             >
                                 {/* Hit Target Zone */}
                                 <div className={`absolute bottom-0 w-full h-8 border-y-4 ${laneBorderColors[i]} bg-white/10 opacity-50`}></div>
@@ -624,43 +814,14 @@ export const RhythmGame: React.FC<RhythmGameProps> = ({
                         ))}
                     </div>
 
-                    {/* NOTES */}
-                    {notes.map(note => {
-                        const currentTime = Date.now() - startTimeRef.current - totalPauseDurationRef.current;
-                        const timeUntilHit = note.timestamp - currentTime;
-                        const progress = 1 - (timeUntilHit / 1500); 
-
-                        if (progress < 0 || progress > 1.1) return null;
-
-                        return (
-                            <div 
-                                key={note.id}
-                                className="absolute w-1/4 flex justify-center items-center pointer-events-none"
-                                style={{
-                                    left: `${note.lane * 25}%`,
-                                    top: `${progress * 90}%`,
-                                    height: '60px',
-                                    opacity: progress < 0.1 ? progress * 10 : 1
-                                }}
-                            >
-                                {/* Note Graphic: Glowing Pixel Shape */}
-                                <div 
-                                    className={`
-                                        w-full aspect-video ${laneColors[note.lane]}
-                                        shadow-[0_0_15px_currentColor] border-2 border-white
-                                        transform rotate-45 scale-75
-                                        ${progress > 0.85 && progress < 1.05 ? 'brightness-150' : ''}
-                                    `}
-                                    style={{
-                                        width: `${30 + (progress * 40)}px`,
-                                        height: `${30 + (progress * 40)}px`,
-                                    }}
-                                >
-                                    <div className="absolute inset-2 border border-black/50"></div>
-                                </div>
-                            </div>
-                        );
-                    })}
+                    {/* NOTES CANVAS */}
+                    <canvas 
+                        ref={canvasRef} 
+                        width={800} 
+                        height={600} 
+                        className="absolute inset-0 w-full h-full pointer-events-none z-10"
+                        style={{ filter: 'drop-shadow(0 0 10px rgba(255,255,255,0.2))' }}
+                    />
                 </div>
 
                 {/* HUD Elements */}
@@ -735,6 +896,13 @@ export const RhythmGame: React.FC<RhythmGameProps> = ({
                  {/* Retro Visual Overlay */}
                  <div className="absolute inset-0 pointer-events-none bg-[url('https://www.transparenttextures.com/patterns/diagmonds-light.png')] opacity-10"></div>
 
+                 {/* Stadium Steps */}
+                 {environment === 'STADIUM' && (
+                     <div className="absolute inset-0 pointer-events-none" style={{
+                         background: 'repeating-linear-gradient(to top, transparent, transparent 40px, rgba(0,0,0,0.2) 40px, rgba(0,0,0,0.2) 45px)'
+                     }}></div>
+                 )}
+
                  <div className="absolute top-4 right-20 z-20 text-right">
                      <div className="text-6xl font-pixel text-white drop-shadow-[4px_4px_0_#000]">{timeLeft}</div>
                      <div className="text-xs uppercase font-bold tracking-widest text-yellow-500 bg-black px-1">TIME REMAINING</div>
@@ -771,30 +939,204 @@ export const RhythmGame: React.FC<RhythmGameProps> = ({
                             })}
                         </div>
                     ) : (
-                        <div className="flex flex-wrap justify-center gap-6 items-center transform scale-90">
-                            {visibleMembers.map((member, i) => {
-                                // Check if member is Mace and we have a specific DM uniform
-                                const memberUniform = (member.instrument === InstrumentType.MACE && dmUniform) ? dmUniform 
-                                    : (member.instrument === InstrumentType.MAJORETTE && majoretteUniform) ? majoretteUniform
-                                    : (member.instrument === InstrumentType.GUARD && guardUniform) ? guardUniform
-                                    : (uniform || DEFAULT_UNIFORMS[0]);
+                        <div className="flex flex-col items-center gap-4 w-full mt-10 z-50">
+                            <div className="flex justify-center gap-8 w-full px-4">
+                                {/* Left Tubas & Side DMs */}
+                                <div className="flex flex-col gap-4 items-center">
+                                    {visibleMembers.filter(m => m.instrument === InstrumentType.MACE).slice(0, Math.min(2, Math.ceil(visibleMembers.filter(m => m.instrument === InstrumentType.MACE).length / 2))).map(member => (
+                                        <div key={member.id} className="transform transition-transform duration-100" style={{ transform: `scale(${combo > 20 ? 1.1 : 1})` }}>
+                                            <BandMemberVisual 
+                                                instrument={member.instrument}
+                                                uniform={dmUniform || uniform || DEFAULT_UNIFORMS[0]}
+                                                appearance={member.appearance}
+                                                isPlaying={!isPaused}
+                                                scale={0.9} 
+                                                instrumentConfig={getInstrumentConfig(member.instrument)}
+                                                maceConfig={instrumentDesigns?.mace}
+                                                logoGrid={logoGrid}
+                                                isCranking={isCranking}
+                                            />
+                                        </div>
+                                    ))}
+                                    {visibleMembers.filter(m => m.instrument === InstrumentType.TUBA).slice(0, Math.min(3, Math.ceil(visibleMembers.filter(m => m.instrument === InstrumentType.TUBA).length / 2))).map(member => (
+                                        <div key={member.id} className="transform transition-transform duration-100" style={{ transform: `scale(${combo > 20 ? 1.1 : 1})` }}>
+                                            <BandMemberVisual 
+                                                instrument={member.instrument}
+                                                uniform={uniform || DEFAULT_UNIFORMS[0]}
+                                                appearance={member.appearance}
+                                                isPlaying={!isPaused}
+                                                scale={0.9} 
+                                                instrumentConfig={getInstrumentConfig(member.instrument)}
+                                                logoGrid={logoGrid}
+                                                isCranking={isCranking}
+                                            />
+                                        </div>
+                                    ))}
+                                </div>
 
-                                return (
-                                    <div key={member.id} className="transform transition-transform duration-100" style={{ transform: `scale(${combo > 20 ? 1.1 : 1})` }}>
-                                        <BandMemberVisual 
-                                            instrument={member.instrument}
-                                            uniform={memberUniform}
-                                            appearance={member.appearance}
-                                            isPlaying={!isPaused}
-                                            scale={0.9} 
-                                            instrumentConfig={getInstrumentConfig(member.instrument)}
-                                            maceConfig={instrumentDesigns?.mace}
-                                            logoGrid={logoGrid}
-                                            isCranking={isCranking}
-                                        />
-                                    </div>
-                                );
-                            })}
+                                {/* Main Block (Back to Front) */}
+                                <div className="flex flex-col gap-6 items-center">
+                                    {/* Drumline (Back) */}
+                                    {visibleMembers.filter(m => [InstrumentType.SNARE, InstrumentType.TENOR_QUADS, InstrumentType.TENOR_CHEST, InstrumentType.TENOR_WAIST, InstrumentType.BASS, InstrumentType.CYMBAL].includes(m.instrument)).length > 0 && (
+                                        <div className="flex gap-2 justify-center flex-wrap max-w-lg">
+                                            {visibleMembers.filter(m => [InstrumentType.SNARE, InstrumentType.TENOR_QUADS, InstrumentType.TENOR_CHEST, InstrumentType.TENOR_WAIST, InstrumentType.BASS, InstrumentType.CYMBAL].includes(m.instrument)).slice(0, 7).map(member => (
+                                                <div key={member.id} className="transform transition-transform duration-100" style={{ transform: `scale(${combo > 20 ? 1.1 : 1})` }}>
+                                                    <BandMemberVisual 
+                                                        instrument={member.instrument}
+                                                        uniform={uniform || DEFAULT_UNIFORMS[0]}
+                                                        appearance={member.appearance}
+                                                        isPlaying={!isPaused}
+                                                        scale={0.9} 
+                                                        instrumentConfig={getInstrumentConfig(member.instrument)}
+                                                        logoGrid={logoGrid}
+                                                        isCranking={isCranking}
+                                                    />
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                    {/* Brass */}
+                                    {visibleMembers.filter(m => [InstrumentType.TRUMPET, InstrumentType.TROMBONE, InstrumentType.MELLOPHONE, InstrumentType.BARITONE].includes(m.instrument)).length > 0 && (
+                                        <div className="flex gap-2 justify-center flex-wrap max-w-lg">
+                                            {visibleMembers.filter(m => [InstrumentType.TRUMPET, InstrumentType.TROMBONE, InstrumentType.MELLOPHONE, InstrumentType.BARITONE].includes(m.instrument)).slice(0, 7).map(member => (
+                                                <div key={member.id} className="transform transition-transform duration-100" style={{ transform: `scale(${combo > 20 ? 1.1 : 1})` }}>
+                                                    <BandMemberVisual 
+                                                        instrument={member.instrument}
+                                                        uniform={uniform || DEFAULT_UNIFORMS[0]}
+                                                        appearance={member.appearance}
+                                                        isPlaying={!isPaused}
+                                                        scale={0.9} 
+                                                        instrumentConfig={getInstrumentConfig(member.instrument)}
+                                                        logoGrid={logoGrid}
+                                                        isCranking={isCranking}
+                                                    />
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                    {/* Woodwinds */}
+                                    {visibleMembers.filter(m => [InstrumentType.FLUTE, InstrumentType.CLARINET, InstrumentType.SAX, InstrumentType.PICCOLO].includes(m.instrument)).length > 0 && (
+                                        <div className="flex gap-2 justify-center flex-wrap max-w-lg">
+                                            {visibleMembers.filter(m => [InstrumentType.FLUTE, InstrumentType.CLARINET, InstrumentType.SAX, InstrumentType.PICCOLO].includes(m.instrument)).slice(0, 7).map(member => (
+                                                <div key={member.id} className="transform transition-transform duration-100" style={{ transform: `scale(${combo > 20 ? 1.1 : 1})` }}>
+                                                    <BandMemberVisual 
+                                                        instrument={member.instrument}
+                                                        uniform={uniform || DEFAULT_UNIFORMS[0]}
+                                                        appearance={member.appearance}
+                                                        isPlaying={!isPaused}
+                                                        scale={0.9} 
+                                                        instrumentConfig={getInstrumentConfig(member.instrument)}
+                                                        logoGrid={logoGrid}
+                                                        isCranking={isCranking}
+                                                    />
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                    {/* Majorettes & Guard (Front) */}
+                                    {visibleMembers.filter(m => m.instrument === InstrumentType.MAJORETTE || m.instrument === InstrumentType.GUARD).length > 0 && (
+                                        <div className="flex gap-2 justify-center flex-wrap max-w-lg">
+                                            {visibleMembers.filter(m => m.instrument === InstrumentType.MAJORETTE || m.instrument === InstrumentType.GUARD).slice(0, 7).map(member => (
+                                                <div key={member.id} className="transform transition-transform duration-100" style={{ transform: `scale(${combo > 20 ? 1.1 : 1})` }}>
+                                                    <BandMemberVisual 
+                                                        instrument={member.instrument}
+                                                        uniform={member.instrument === InstrumentType.MAJORETTE ? (majoretteUniform || uniform || DEFAULT_UNIFORMS[0]) : (guardUniform || uniform || DEFAULT_UNIFORMS[0])}
+                                                        appearance={member.appearance}
+                                                        isPlaying={!isPaused}
+                                                        scale={0.9} 
+                                                        instrumentConfig={getInstrumentConfig(member.instrument)}
+                                                        logoGrid={logoGrid}
+                                                        isCranking={isCranking}
+                                                    />
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Right Tubas & Side DMs */}
+                                <div className="flex flex-col gap-4 items-center">
+                                    {visibleMembers.filter(m => m.instrument === InstrumentType.MACE).slice(Math.ceil(visibleMembers.filter(m => m.instrument === InstrumentType.MACE).length / 2), Math.ceil(visibleMembers.filter(m => m.instrument === InstrumentType.MACE).length / 2) + 2).map(member => (
+                                        <div key={member.id} className="transform transition-transform duration-100" style={{ transform: `scale(${combo > 20 ? 1.1 : 1})` }}>
+                                            <BandMemberVisual 
+                                                instrument={member.instrument}
+                                                uniform={dmUniform || uniform || DEFAULT_UNIFORMS[0]}
+                                                appearance={member.appearance}
+                                                isPlaying={!isPaused}
+                                                scale={0.9} 
+                                                instrumentConfig={getInstrumentConfig(member.instrument)}
+                                                maceConfig={instrumentDesigns?.mace}
+                                                logoGrid={logoGrid}
+                                                isCranking={isCranking}
+                                            />
+                                        </div>
+                                    ))}
+                                    {visibleMembers.filter(m => m.instrument === InstrumentType.TUBA).slice(Math.ceil(visibleMembers.filter(m => m.instrument === InstrumentType.TUBA).length / 2), Math.ceil(visibleMembers.filter(m => m.instrument === InstrumentType.TUBA).length / 2) + 3).map(member => (
+                                        <div key={member.id} className="transform transition-transform duration-100" style={{ transform: `scale(${combo > 20 ? 1.1 : 1})` }}>
+                                            <BandMemberVisual 
+                                                instrument={member.instrument}
+                                                uniform={uniform || DEFAULT_UNIFORMS[0]}
+                                                appearance={member.appearance}
+                                                isPlaying={!isPaused}
+                                                scale={0.9} 
+                                                instrumentConfig={getInstrumentConfig(member.instrument)}
+                                                logoGrid={logoGrid}
+                                                isCranking={isCranking}
+                                            />
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Front DM */}
+                            {visibleMembers.filter(m => m.instrument === InstrumentType.MACE).length > 0 && (
+                                <div className="mt-4">
+                                    {(() => {
+                                        const frontDM = visibleMembers.filter(m => m.instrument === InstrumentType.MACE)[0];
+                                        const memberUniform = dmUniform || uniform || DEFAULT_UNIFORMS[0];
+                                        return (
+                                            <div key={frontDM.id} className="transform transition-transform duration-100" style={{ transform: `scale(${combo > 20 ? 1.1 : 1})` }}>
+                                                <BandMemberVisual 
+                                                    instrument={frontDM.instrument}
+                                                    uniform={memberUniform}
+                                                    appearance={frontDM.appearance}
+                                                    isPlaying={!isPaused}
+                                                    scale={0.9} 
+                                                    instrumentConfig={getInstrumentConfig(frontDM.instrument)}
+                                                    maceConfig={instrumentDesigns?.mace}
+                                                    logoGrid={logoGrid}
+                                                    isCranking={isCranking}
+                                                />
+                                            </div>
+                                        );
+                                    })()}
+                                </div>
+                            )}
+
+                            {/* Director on Podium */}
+                            <div className="relative mt-8 flex flex-col items-center">
+                                {/* Director (Facing BACK) */}
+                                <div className="absolute bottom-16 z-10">
+                                    <BandMemberVisual 
+                                        instrument={InstrumentType.MACE}
+                                        showInstrument={false}
+                                        uniform={dmUniform || uniform || DEFAULT_UNIFORMS[0]}
+                                        appearance={{ skinColor: '#dca586', hairColor: '#000', hairStyle: 1, bodyType: 'average', accessoryId: 0 }}
+                                        isPlaying={!isPaused}
+                                        scale={0.9} 
+                                        isCranking={isCranking}
+                                        view="BACK"
+                                    />
+                                </div>
+                                {/* Podium (Ladder style) */}
+                                <div className="w-24 h-32 bg-transparent border-x-4 border-t-4 border-gray-400 flex flex-col items-center justify-between py-2 relative z-20">
+                                    <div className="w-full h-2 bg-gray-500 shadow-md"></div>
+                                    <div className="w-full h-2 bg-gray-500 shadow-md"></div>
+                                    <div className="w-full h-2 bg-gray-500 shadow-md"></div>
+                                    <div className="w-full h-2 bg-gray-500 shadow-md"></div>
+                                    <div className="w-full h-2 bg-gray-500 shadow-md"></div>
+                                </div>
+                            </div>
                         </div>
                     )}
                  </div>

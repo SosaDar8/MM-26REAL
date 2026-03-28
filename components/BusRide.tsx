@@ -43,42 +43,62 @@ export const BusRide: React.FC<BusRideProps> = ({ gameState, onComplete }) => {
             {/* Window View (Parallax) */}
             <div className="h-2/3 w-full relative overflow-hidden bg-sky-300 border-b-8 border-gray-800">
                 {/* Sun/Sky */}
-                <div className="absolute top-4 right-10 w-24 h-24 bg-yellow-300 rounded-full blur-xl opacity-80"></div>
+                <div className="absolute top-4 right-10 w-24 h-24 bg-yellow-300 rounded-full blur-xl opacity-80 shadow-[0_0_50px_rgba(253,224,71,0.8)]"></div>
                 
+                {/* Clouds */}
+                <div className="absolute top-10 w-[200%] flex opacity-80" style={{ transform: `translateX(-${scrollPos * 0.5}px)` }}>
+                    <div className="w-48 h-16 bg-white rounded-full blur-sm mx-20 shadow-lg"></div>
+                    <div className="w-64 h-20 bg-white rounded-full blur-sm mx-40 mt-8 shadow-lg"></div>
+                    <div className="w-32 h-12 bg-white rounded-full blur-sm mx-10 -mt-4 shadow-lg"></div>
+                    <div className="w-56 h-16 bg-white rounded-full blur-sm mx-32 mt-2 shadow-lg"></div>
+                </div>
+
                 {/* Distant Hills */}
                 <div 
-                    className="absolute bottom-0 w-[200%] h-32 bg-green-800 rounded-[50%] flex items-end" 
+                    className="absolute bottom-16 w-[200%] h-40 bg-green-800 rounded-[100%] flex items-end opacity-90" 
                     style={{ transform: `translateX(-${scrollPos * 0.2}px)` }}
+                ></div>
+                <div 
+                    className="absolute bottom-16 w-[200%] h-32 bg-green-700 rounded-[80%] flex items-end opacity-80 left-1/4" 
+                    style={{ transform: `translateX(-${scrollPos * 0.3}px)` }}
                 ></div>
 
                 {/* Trees (Fast) */}
                 <div 
-                    className="absolute bottom-0 w-[200%] h-full flex items-end pointer-events-none" 
+                    className="absolute bottom-16 w-[200%] h-full flex items-end pointer-events-none" 
                     style={{ transform: `translateX(-${scrollPos * 2}px)` }}
                 >
-                    {[...Array(20)].map((_, i) => (
-                        <div key={i} className="w-32 h-64 bg-green-900 mx-20 rounded-t-full border-l-4 border-black/20 relative">
-                            <div className="absolute bottom-0 w-8 h-32 bg-brown-800 left-1/2 -translate-x-1/2 bg-[#5d4037]"></div>
+                    {[...Array(30)].map((_, i) => (
+                        <div key={i} className="w-20 h-56 bg-green-900 mx-12 rounded-t-full border-l-8 border-black/20 relative flex flex-col items-center justify-end shadow-xl">
+                            <div className="w-6 h-16 bg-[#5d4037] border-l-2 border-black/30"></div>
                         </div>
                     ))}
                 </div>
 
                 {/* Road */}
-                <div className="absolute bottom-0 w-full h-16 bg-gray-600 border-t-4 border-gray-500">
-                    <div className="w-full h-2 mt-6 bg-dashed border-t-4 border-white/50 border-dashed"></div>
+                <div className="absolute bottom-0 w-full h-16 bg-gray-700 border-t-4 border-gray-500 flex items-center overflow-hidden shadow-[inset_0_10px_20px_rgba(0,0,0,0.3)]">
+                    <div className="w-[200%] h-2 flex gap-12" style={{ transform: `translateX(-${scrollPos * 4}px)` }}>
+                        {[...Array(40)].map((_, i) => (
+                            <div key={i} className="w-24 h-full bg-yellow-400 shadow-[0_0_5px_rgba(250,204,21,0.5)]"></div>
+                        ))}
+                    </div>
                 </div>
 
                 {/* Interior Bus Frame */}
-                <div className="absolute inset-0 border-[40px] border-gray-800 rounded-lg pointer-events-none z-10 shadow-inner"></div>
-                <div className="absolute top-1/2 left-0 w-full h-4 bg-gray-400 z-10 opacity-50"></div> {/* Window bar */}
+                <div className="absolute inset-0 border-[40px] border-gray-800 rounded-lg pointer-events-none z-10 shadow-[inset_0_0_50px_rgba(0,0,0,0.9)]"></div>
+                <div className="absolute top-1/2 left-0 w-full h-8 bg-gray-900 z-10 opacity-90 border-y-2 border-gray-700 shadow-2xl flex items-center justify-center">
+                    <div className="w-full h-1 bg-black/50"></div>
+                </div> {/* Window bar */}
             </div>
 
             {/* Bus Interior UI */}
-            <div className="h-1/3 bg-[#333] p-6 flex gap-8 items-center z-20 shadow-[0_-10px_20px_rgba(0,0,0,0.5)]">
+            <div className="h-1/3 bg-[#222] p-6 flex gap-8 items-center z-20 shadow-[0_-10px_30px_rgba(0,0,0,0.8)] border-t-4 border-black">
                 {/* Seats Visual */}
-                <div className="w-1/3 flex justify-center items-end h-full bg-blue-900 rounded-t-lg border-4 border-blue-950 p-4 relative overflow-hidden">
-                    <div className="absolute inset-0 bg-black/20"></div>
-                    <div className="flex gap-4 transform scale-125 translate-y-4">
+                <div className="w-1/3 flex justify-center items-end h-full bg-blue-900 rounded-t-xl border-4 border-blue-950 p-4 relative overflow-hidden shadow-[inset_0_20px_30px_rgba(0,0,0,0.6)]">
+                    <div className="absolute inset-0 bg-gradient-to-b from-black/40 to-transparent"></div>
+                    {/* Headrests */}
+                    <div className="absolute top-0 w-full h-16 bg-blue-800 rounded-t-xl border-b-4 border-blue-950 shadow-md"></div>
+                    <div className="flex gap-8 transform scale-[1.35] translate-y-16 z-10 origin-bottom">
                         <BandMemberVisual 
                             instrument={InstrumentType.TRUMPET} 
                             uniform={gameState.uniforms[0]} 

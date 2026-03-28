@@ -1,15 +1,16 @@
 
 import React, { useState, useEffect } from 'react';
-import { Director, InstrumentType, Uniform } from '../types';
+import { Director, InstrumentType, Uniform, BandIdentity } from '../types';
 import { BandMemberVisual } from './BandMemberVisual';
 import { Button } from './Button';
 
 interface DirectorWalkInProps {
     director: Director;
+    identity?: BandIdentity;
     onComplete: (bonus: 'FUNDS' | 'FANS' | 'SKILL') => void;
 }
 
-export const DirectorWalkIn: React.FC<DirectorWalkInProps> = ({ director, onComplete }) => {
+export const DirectorWalkIn: React.FC<DirectorWalkInProps> = ({ director, identity, onComplete }) => {
     const [scene, setScene] = useState<'WALKING' | 'ARRIVED' | 'CHOICE'>('WALKING');
     const [walkPos, setWalkPos] = useState(-20); // Start off screen left
 
@@ -84,6 +85,7 @@ export const DirectorWalkIn: React.FC<DirectorWalkInProps> = ({ director, onComp
                                 uniform={getDirectorUniform()}
                                 appearance={director.appearance}
                                 isPlaying={true} // Triggers march animation
+                                bandIdentity={identity}
                             />
                         </div>
                     </div>
@@ -119,6 +121,7 @@ export const DirectorWalkIn: React.FC<DirectorWalkInProps> = ({ director, onComp
                                 uniform={getDirectorUniform()}
                                 appearance={director.appearance}
                                 isPlaying={false}
+                                bandIdentity={identity}
                             />
                         </div>
                     </div>

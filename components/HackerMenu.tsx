@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { GameState, BandMember, ShopItem, Achievement, ScheduleEvent } from '../types';
+import { GameState, BandMember, ShopItem, Achievement, ScheduleEvent, EventType } from '../types';
 import { SHOP_ITEMS, INITIAL_ACHIEVEMENTS } from '../constants';
 import { Button } from './Button';
 import { SecretSettings } from './SecretSettings';
@@ -85,11 +85,11 @@ export const HackerMenu: React.FC<HackerMenuProps> = ({ gameState, setGameState,
             id: `evt_custom_${Date.now()}`,
             date: Date.now(),
             name: "CUSTOM BATTLE ROYALE",
-            type: 'BATTLE',
+            type: EventType.BATTLE,
             opponent: "The Developers",
-            difficulty: 5,
             completed: false,
-            rewards: { funds: 5000, fans: 5000 }
+            reward: 5000,
+            level: 'COLLEGE'
         };
         
         setGameState(prev => ({

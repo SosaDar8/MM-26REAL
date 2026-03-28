@@ -38,9 +38,10 @@ import { BoardMeeting } from './components/BoardMeeting';
 import { DirectorWalkIn } from './components/DirectorWalkIn';
 import { BusRide } from './components/BusRide';
 import { LagDetector } from './components/LagDetector';
+import { CommunityHub } from './components/CommunityHub';
 
 import { CreatorMenu } from './components/CreatorMenu';
-import { GamePhase, GameState, BandStyle, BandMember, Drill, Director, BandIdentity, DirectorTrait, Uniform, Settings, CareerState, GameBuff, Transaction, Moment, Message, CutsceneData, PhoneSettings, InstrumentType, ShopItem, Job, CampusLocationId, MusicTrack, EventType, ScheduleEvent, VideoContent, Notification, SequencerTrack, SongCategory } from './types';
+import { GamePhase, GameState, BandStyle, BandMember, Drill, Director, BandIdentity, DirectorTrait, Uniform, Settings, CareerState, GameBuff, Transaction, Moment, Message, CutsceneData, PhoneSettings, InstrumentType, ShopItem, Job, CampusLocationId, MusicTrack, EventType, ScheduleEvent, VideoContent, Notification, SequencerTrack, SongCategory, StaffMember, Skin } from './types';
 import { OG_MEMBERS, INITIAL_FUNDS, INITIAL_FANS, DEFAULT_APPEARANCE, DEFAULT_UNIFORMS, DEFAULT_OUTFITS, INITIAL_SETTINGS, INITIAL_DRILL, BASE_HS_SCHEDULE, BASE_COLLEGE_SCHEDULE, INITIAL_QUESTS, INITIAL_ACHIEVEMENTS, INITIAL_TRACKS, INITIAL_MEDIA, INITIAL_MOMENTS, INITIAL_PHONE_SETTINGS, generateBalancedRoster, getRandomAppearance, MOCK_RECRUITS, DEFAULT_INSTRUMENT_DESIGNS, DEFAULT_DM_UNIFORM, DEFAULT_MAJORETTE_UNIFORM, DEFAULT_GUARD_UNIFORM, SCHOOLS_DATA, RECRUIT_NAMES, RECRUIT_SURNAMES, GAME_NAME, generateRandomSchedule, GAME_VERSION, MINI_ACHIEVEMENTS, generateOpponentIdentity, RIVAL_DIRECTOR_NAMES, SCHOOL_PREFIXES, SCHOOL_NOUNS } from './constants';
 import { generateBatchPosts, generatePost } from './services/socialGenerator';
 import { INITIAL_DIRECTOR_MESSAGES, INITIAL_CAREER_MESSAGES, generateRandomMessage } from './services/messageGenerator';
@@ -191,6 +192,9 @@ const App: React.FC = () => {
                   musicLibrary: mergedLibrary,
                   trophies: parsed.trophies || [],
                   assistant: parsed.assistant || undefined,
+                  staff: parsed.staff || [],
+                  inbox: parsed.inbox || [],
+                  lastDailyReward: parsed.lastDailyReward || 0,
                   identity: { ...parsed.identity, useSchoolLogo: parsed.identity?.useSchoolLogo ?? false },
                   settings: { ...INITIAL_SETTINGS, ...parsed.settings }
               };
@@ -199,10 +203,10 @@ const App: React.FC = () => {
       
       return {
         mode: 'DIRECTOR', funds: INITIAL_FUNDS, transactions: [], fans: INITIAL_FANS, reputation: 0, bandName: "", style: BandStyle.SHOW,
-        members: OG_MEMBERS, recruitPool: MOCK_RECRUITS, drills: [INITIAL_DRILL], activeDrillId: INITIAL_DRILL.id, schedule: BASE_COLLEGE_SCHEDULE,
+        members: OG_MEMBERS, recruitPool: MOCK_RECRUITS, staff: [], drills: [INITIAL_DRILL], activeDrillId: INITIAL_DRILL.id, schedule: BASE_COLLEGE_SCHEDULE,
         activeEventId: null, activeBuff: { type: 'NONE', value: 0, description: '' }, quests: INITIAL_QUESTS, achievements: INITIAL_ACHIEVEMENTS,
         musicLibrary: sessionMusic, // Use generated music
-        mediaFeed: INITIAL_MEDIA, moments: INITIAL_MOMENTS, messages: INITIAL_DIRECTOR_MESSAGES, tutorialStep: 0,
+        mediaFeed: INITIAL_MEDIA, moments: INITIAL_MOMENTS, messages: INITIAL_DIRECTOR_MESSAGES, inbox: [], lastDailyReward: 0, tutorialStep: 0, skins: [],
         director: { name: 'New Director', gender: 'MALE', trait: DirectorTrait.SHOWMAN, appearance: DEFAULT_APPEARANCE, outfits: DEFAULT_OUTFITS, currentOutfitId: DEFAULT_OUTFITS[0].id },
         identity: { schoolName: 'Pixel University', schoolType: 'College', mascot: 'Marchers', primaryColor: '#ef4444', secondaryColor: '#ffffff', useSchoolLogo: false },
         uniforms: [...DEFAULT_UNIFORMS, DEFAULT_DM_UNIFORM, DEFAULT_MAJORETTE_UNIFORM, DEFAULT_GUARD_UNIFORM], 
@@ -214,6 +218,7 @@ const App: React.FC = () => {
         settings: INITIAL_SETTINGS, phoneSettings: INITIAL_PHONE_SETTINGS, unlockedItems: [], placedDecorations: [], phoneGameHighScores: { career: 0, director: 0 },
         alumniDonations: 0,
         uploadedVideos: [],
+        clips: 0,
         shownNotifications: [],
         trophies: [],
         assistant: undefined,
@@ -283,6 +288,7 @@ const App: React.FC = () => {
           if (action === 'UPLOAD_VIDEO' && data) {
               setGameState(p => ({
                   ...p, 
+                  clips: Math.max(0, (p.clips || 0) - 1),
                   uploadedVideos: [data, ...p.uploadedVideos],
                   // Add a notification/post about the video
                   mediaFeed: [{
@@ -319,6 +325,25 @@ const App: React.FC = () => {
                   transactions: [...prev.transactions, { id: `tx-rec-${Date.now()}`, date: 'Today', type: 'EXPENSE', category: 'RECRUITMENT', amount: member.salary, description: `Hired ${member.name}` }]
               }));
               triggerNotification('first_recruit');
+          } else if (action === 'ADD_CLIPS' && typeof data === 'number') {
+              setGameState(p => ({
+                  ...p,
+                  clips: (p.clips || 0) + data
+              }));
+          } else if (action === 'ADD_BATTLE_VIDEO' && data) {
+              setGameState(p => ({
+                  ...p,
+                  uploadedVideos: [data, ...p.uploadedVideos],
+                  mediaFeed: [{
+                      id: `notif-battle-${Date.now()}`,
+                      author: "MeTube",
+                      handle: "@system",
+                      content: `New Battle Video: "${data.title}" is trending!`,
+                      likes: Math.floor(Math.random() * 500) + 100,
+                      timestamp: "Just now",
+                      type: 'SOCIAL'
+                  }, ...p.mediaFeed]
+              }));
           }
       };
       
@@ -412,8 +437,8 @@ const App: React.FC = () => {
               })
           }));
 
-          // 2. RIVAL INTERACTION (15% chance)
-          if (rnd < 0.15 && gameState.rivalDirector) {
+          // 2. RIVAL INTERACTION (2% chance)
+          if (rnd < 0.02 && gameState.rivalDirector) {
               const rivalName = gameState.rivalDirector;
               const rivalSchool = gameState.rivalIdentity?.schoolName || "Rival School";
               
@@ -479,8 +504,9 @@ const App: React.FC = () => {
       }
   };
 
-  const handleStartGame = (mode: 'DIRECTOR' | 'CAREER') => {
+  const handleStartGame = (mode: 'DIRECTOR' | 'CAREER' | 'COMMUNITY_HUB') => {
       if (mode === 'CAREER') setCurrentPhase(GamePhase.CAREER_SETUP);
+      else if (mode === 'COMMUNITY_HUB') setCurrentPhase(GamePhase.COMMUNITY_HUB);
       else setCurrentPhase(GamePhase.BOARD_MEETING); 
   };
 
@@ -549,6 +575,11 @@ const App: React.FC = () => {
           schedule: updatedSchedule,
           uniforms: initialUniform ? [initialUniform] : prev.uniforms,
           currentUniformId: initialUniform ? initialUniform.id : prev.currentUniformId,
+          instrumentDesigns: {
+              ...prev.instrumentDesigns,
+              percussion: { ...prev.instrumentDesigns.percussion, primaryColor: identity.primaryColor, secondaryColor: identity.secondaryColor },
+              mace: { ...prev.instrumentDesigns.mace, headColor: identity.primaryColor, shaftColor: identity.secondaryColor, cordPrimary: identity.primaryColor, cordSecondary: identity.secondaryColor, ferruleColor: identity.primaryColor }
+          },
           rivalIdentity: rivalData.identity,
           rivalDirector: rivalDirectorName,
           settings: {
@@ -617,13 +648,15 @@ const App: React.FC = () => {
 
   const handleAuditionComplete = (member: BandMember, status: 'P1' | 'P2' | 'P3' | 'P4' | 'P5') => {
       if (status !== 'P5') {
-          const hiredMember = { ...member, status };
+          const hasRecruiter = gameState.staff.some(s => s.role === 'Recruiter');
+          const finalSalary = hasRecruiter ? Math.floor(member.salary * 0.8) : member.salary;
+          const hiredMember = { ...member, status, salary: finalSalary };
           setGameState(prev => ({
               ...prev,
-              funds: prev.funds - member.salary,
+              funds: prev.funds - finalSalary,
               members: [...prev.members, hiredMember],
               recruitPool: prev.recruitPool.filter(r => r.id !== member.id),
-              transactions: [...prev.transactions, { id: `tx-rec-${Date.now()}`, date: 'Today', type: 'EXPENSE', category: 'RECRUITMENT', amount: member.salary, description: `Hired ${member.name} (${status})` }]
+              transactions: [...prev.transactions, { id: `tx-rec-${Date.now()}`, date: 'Today', type: 'EXPENSE', category: 'RECRUITMENT', amount: finalSalary, description: `Hired ${member.name} (${status})` }]
           }));
           triggerNotification('first_recruit');
       }
@@ -635,12 +668,25 @@ const App: React.FC = () => {
       const count = tier === 'HIGH' ? 3 : tier === 'MID' ? 2 : 1;
       const newRecruits = generateBalancedRoster(count);
       
+      const hasRecruiter = gameState.staff.some(s => s.role === 'Recruiter');
+      const finalCost = hasRecruiter ? Math.floor(cost * 0.8) : cost;
+      
       setGameState(prev => ({
           ...prev,
-          funds: prev.funds - cost,
+          funds: prev.funds - finalCost,
           recruitPool: [...prev.recruitPool, ...newRecruits],
-          transactions: [...prev.transactions, { id: `tx-scout-${Date.now()}`, date: 'Today', type: 'EXPENSE', category: 'RECRUITMENT', amount: cost, description: `Scouting: ${tier}` }]
+          transactions: [...prev.transactions, { id: `tx-scout-${Date.now()}`, date: 'Today', type: 'EXPENSE', category: 'RECRUITMENT', amount: finalCost, description: `Scouting: ${tier}` }]
       }));
+  };
+
+  const handleHireStaff = (staff: StaffMember) => {
+      if (gameState.funds >= staff.salary) {
+          setGameState(prev => ({
+              ...prev,
+              funds: prev.funds - staff.salary,
+              staff: [...(prev.staff || []), staff]
+          }));
+      }
   };
 
   const handlePurchase = (item: ShopItem) => {
@@ -666,6 +712,9 @@ const App: React.FC = () => {
   };
 
   const handleUniformSave = (uniforms: Uniform[], activeIds: { band: string, dm?: string, majorette?: string, guard?: string }, cost: number) => {
+      const hasEquipManager = gameState.staff.some(s => s.role === 'Equipment Manager');
+      const finalCost = hasEquipManager ? Math.floor(cost * 0.8) : cost;
+
       setGameState(prev => ({
           ...prev,
           uniforms,
@@ -673,27 +722,28 @@ const App: React.FC = () => {
           dmUniformId: activeIds.dm,
           majoretteUniformId: activeIds.majorette,
           guardUniformId: activeIds.guard,
-          funds: prev.funds - (cost || 0),
-          transactions: cost > 0 ? [...prev.transactions, { 
+          funds: prev.funds - (finalCost || 0),
+          transactions: finalCost > 0 ? [...prev.transactions, { 
               id: `tx-uniform-${Date.now()}`, 
               date: 'Today', 
               type: 'EXPENSE', 
               category: 'UNIFORMS', 
-              amount: cost, 
+              amount: finalCost, 
               description: "Uniform Purchase" 
           }] : prev.transactions
       }));
       triggerNotification('uniform_edit');
   };
 
-  const handleLogoSave = (logo: string[], isSchoolLogo: boolean) => {
+  const handleLogoSave = (schoolLogo: string[], bandLogo: string[], schoolLogoText: string, bandLogoText: string) => {
       setGameState(prev => ({
           ...prev,
           identity: { 
               ...prev.identity, 
-              bandLogo: isSchoolLogo ? prev.identity.bandLogo : logo,
-              schoolLogo: isSchoolLogo ? logo : prev.identity.schoolLogo,
-              useSchoolLogo: isSchoolLogo
+              schoolLogo,
+              bandLogo,
+              schoolLogoText,
+              bandLogoText
           }
       }));
       setCurrentPhase(GamePhase.HOME);
@@ -712,6 +762,7 @@ const App: React.FC = () => {
       let newAchievements = [...gameState.achievements];
       let newFunds = gameState.funds + baseReward;
       let newFans = gameState.fans + (win ? 100 : -20);
+      let newReputation = Math.max(0, Math.min(100, (gameState.reputation || 0) + (win ? 10 : -5)));
       let newTrophies = [...gameState.trophies];
 
       // Unlock First Win Trophy
@@ -756,7 +807,8 @@ const App: React.FC = () => {
               handle: `@${currentEvent.opponent.replace(/\s/g, '')}Official`,
               content: `Imagine wearing those ${gameState.uniforms[0].jacketColor} rags and calling it a uniform. Easy W. 🗑️ #bandlife #${gameState.identity.schoolName}Sucks`,
               likes: 420,
-              timestamp: 'Just now'
+              timestamp: 'Just now',
+              type: 'RIVAL'
           });
       }
 
@@ -769,6 +821,7 @@ const App: React.FC = () => {
           } : e),
           funds: newFunds,
           fans: newFans,
+          reputation: newReputation,
           achievements: newAchievements,
           trophies: newTrophies,
           mediaFeed: [...newTweets, ...prev.mediaFeed],
@@ -824,6 +877,9 @@ const App: React.FC = () => {
             />
           );
       
+      case GamePhase.COMMUNITY_HUB:
+          return <CommunityHub gameState={gameState} setGameState={setGameState} setPhase={(p) => setCurrentPhase(p as GamePhase)} />;
+      
       case GamePhase.BOARD_MEETING:
           return <BoardMeeting onComplete={handleBoardMeetingComplete} />;
 
@@ -831,10 +887,10 @@ const App: React.FC = () => {
           return <Customization onComplete={handleCustomizationComplete} preSetDirectorName={tempDirectorName} loyaltyMod={loyaltyFactor} />;
       
       case 'SETUP_AVATAR':
-          return <AvatarEditor director={gameState.director} onSave={(d) => { setGameState(p => ({...p, director: d})); setCurrentPhase(GamePhase.WALK_IN); }} onBack={() => {}} unlockedItems={gameState.unlockedItems} customAssets={gameState.customAssets} customShopItems={gameState.customShopItems} />;
+          return <AvatarEditor director={gameState.director} bandIdentity={gameState.identity} onSave={(d) => { setGameState(p => ({...p, director: d})); setCurrentPhase(GamePhase.WALK_IN); }} onBack={() => {}} unlockedItems={gameState.unlockedItems} customAssets={gameState.customAssets} customShopItems={gameState.customShopItems} />;
 
       case GamePhase.WALK_IN:
-          return <DirectorWalkIn director={gameState.director} onComplete={handleWalkInComplete} />;
+          return <DirectorWalkIn director={gameState.director} identity={gameState.identity} onComplete={handleWalkInComplete} />;
 
       case GamePhase.CAREER_SETUP: 
           return <CareerSetup onComplete={handleCareerComplete} onBack={() => setCurrentPhase(GamePhase.TITLE)} />;
@@ -852,7 +908,7 @@ const App: React.FC = () => {
       case GamePhase.AUDITION:
           return auditionCandidate ? <AuditionScene candidate={auditionCandidate} onDecision={handleAuditionComplete} /> : <div/>;
       case GamePhase.MANAGEMENT: 
-          return <Management gameState={gameState} onRecruit={(m) => handleAuditionStart(m)} onBack={() => setCurrentPhase(GamePhase.BAND_OFFICE)} />;
+          return <Management gameState={gameState} onRecruit={(m) => handleAuditionStart(m)} onHireStaff={handleHireStaff} onBack={() => setCurrentPhase(GamePhase.BAND_OFFICE)} />;
       case GamePhase.STORE: 
           return <BookerStore gameState={gameState} onPurchase={handlePurchase} onBack={() => setCurrentPhase(GamePhase.HOME)} onEquip={(item) => { 
               if(item.category === 'CLOTHING') setCurrentPhase(GamePhase.AVATAR_EDITOR); 
@@ -864,16 +920,60 @@ const App: React.FC = () => {
       case GamePhase.EDITOR: 
           return <FormationEditor gameState={gameState} onSave={handleDrillSave} onBack={() => setCurrentPhase(GamePhase.HOME)} />;
       case GamePhase.UNIFORM_EDITOR: 
-          return <UniformEditor uniforms={gameState.uniforms} activeIds={{ band: gameState.currentUniformId, dm: gameState.dmUniformId, majorette: gameState.majoretteUniformId, guard: gameState.guardUniformId }} onSave={handleUniformSave} onBack={() => setCurrentPhase(GamePhase.HOME)} identity={gameState.identity} budget={gameState.funds} isCostEnabled={gameState.settings.enableUniformCost} customAssets={gameState.customAssets} />;
+          return <UniformEditor 
+              uniforms={gameState.uniforms} 
+              activeIds={{ band: gameState.currentUniformId, dm: gameState.dmUniformId, majorette: gameState.majoretteUniformId, guard: gameState.guardUniformId }} 
+              onSave={handleUniformSave} 
+              onBack={() => setCurrentPhase(GamePhase.HOME)} 
+              identity={gameState.identity} 
+              budget={gameState.funds} 
+              isCostEnabled={gameState.settings.enableUniformCost} 
+              customAssets={gameState.customAssets} 
+              hasEquipManager={gameState.staff.some(s => s.role === 'Equipment Manager')}
+          />;
       case GamePhase.LOGO_EDITOR: 
-          return <LogoEditor currentLogo={gameState.identity.bandLogo} primaryColor={gameState.identity.primaryColor} secondaryColor={gameState.identity.secondaryColor} isSchoolLogo={gameState.identity.useSchoolLogo} onSave={handleLogoSave} onBack={() => setCurrentPhase(GamePhase.HOME)} />;
+          return <LogoEditor 
+              schoolLogo={gameState.identity.schoolLogo} 
+              bandLogo={gameState.identity.bandLogo} 
+              schoolLogoText={gameState.identity.schoolLogoText}
+              bandLogoText={gameState.identity.bandLogoText}
+              primaryColor={gameState.identity.primaryColor} 
+              secondaryColor={gameState.identity.secondaryColor} 
+              onSave={handleLogoSave} 
+              onBack={() => setCurrentPhase(GamePhase.HOME)} 
+          />;
       case GamePhase.AVATAR_EDITOR: 
-          return <AvatarEditor director={gameState.director} onSave={(d) => { setGameState(p => ({...p, director: d})); setCurrentPhase(GamePhase.HOME); }} onBack={() => setCurrentPhase(GamePhase.HOME)} unlockedItems={gameState.unlockedItems} customAssets={gameState.customAssets} customShopItems={gameState.customShopItems} />;
+          return <AvatarEditor director={gameState.director} bandIdentity={gameState.identity} onSave={(d) => { setGameState(p => ({...p, director: d})); setCurrentPhase(GamePhase.HOME); }} onBack={() => setCurrentPhase(GamePhase.HOME)} unlockedItems={gameState.unlockedItems} customAssets={gameState.customAssets} customShopItems={gameState.customShopItems} />;
       case GamePhase.INSTRUMENT_DESIGNER: 
           return <InstrumentDesigner gameState={gameState} onSave={(d, u) => { setGameState(p => ({...p, instrumentDesigns: d, uniforms: p.uniforms.map(un => un.id === p.currentUniformId ? {...un, ...u} : un) })); setCurrentPhase(GamePhase.HOME); }} onBack={() => setCurrentPhase(GamePhase.HOME)} />;
 
       case GamePhase.PRACTICE: 
-          return <PracticeMode gameState={gameState} onBack={() => setCurrentPhase(GamePhase.HOME)} />;
+          return <PracticeMode 
+              gameState={gameState} 
+              onBack={() => setCurrentPhase(GamePhase.HOME)} 
+              onComplete={(skillGain, energyCost, specificBonuses) => {
+                  setGameState(prev => ({
+                      ...prev,
+                      members: prev.members.map(m => {
+                          let extraBonus = 0;
+                          if (m.section === 'Percussion' || m.section === 'Pit') extraBonus = specificBonuses.percussion;
+                          if (m.section === 'Color Guard') extraBonus = specificBonuses.guard;
+                          if (['Trumpet', 'Trombone', 'Tuba', 'Mellophone', 'Baritone'].includes(m.section)) extraBonus = specificBonuses.brass;
+                          
+                          return {
+                              ...m,
+                              playSkill: Math.min(100, m.playSkill + skillGain + extraBonus),
+                              marchSkill: Math.min(100, m.marchSkill + skillGain + extraBonus)
+                          };
+                      }),
+                      career: prev.career ? {
+                          ...prev.career,
+                          energy: Math.max(0, prev.career.energy - energyCost)
+                      } : prev.career
+                  }));
+                  setCurrentPhase(GamePhase.HOME);
+              }}
+          />;
       
       case GamePhase.BUS_RIDE:
           return <BusRide gameState={gameState} onComplete={() => setCurrentPhase(GamePhase.PEP_TALK)} />;

@@ -144,6 +144,56 @@ export const CutsceneOverlay: React.FC<CutsceneOverlayProps> = ({ data, onComple
                         <p className="text-purple-400 font-bold mt-2">Hype +20 | Energy -30</p>
                     </div>
                 );
+            case 'STAFF_MEETING':
+                return (
+                    <div className="w-full h-full bg-slate-200 flex flex-col items-center justify-center relative border-8 border-slate-400">
+                        <div className="w-64 h-32 bg-yellow-100 border-4 border-yellow-300 flex items-center justify-center relative shadow-lg">
+                            <div className="absolute top-2 left-2 text-2xl">🍩</div>
+                            <div className="absolute top-2 right-2 text-2xl">☕</div>
+                            <div className="text-xl font-bold text-slate-700">AGENDA</div>
+                        </div>
+                        <div className="flex gap-4 mt-8">
+                            <div className="w-16 h-24 bg-blue-600 rounded-t-lg animate-bounce"></div>
+                            <div className="w-16 h-24 bg-red-600 rounded-t-lg animate-bounce delay-100"></div>
+                            <div className="w-16 h-24 bg-green-600 rounded-t-lg animate-bounce delay-200"></div>
+                        </div>
+                        <h2 className="text-4xl font-black text-slate-800 z-10 mt-8 uppercase italic">Staff Meeting...</h2>
+                    </div>
+                );
+            case 'PAPERWORK':
+                return (
+                    <div className="w-full h-full bg-gray-100 flex flex-col items-center justify-center relative border-8 border-gray-400">
+                        <div className="relative">
+                            <div className="w-48 h-64 bg-white border-2 border-gray-300 shadow-xl absolute -rotate-6 transform -translate-x-4"></div>
+                            <div className="w-48 h-64 bg-white border-2 border-gray-300 shadow-xl absolute rotate-3 transform translate-x-4"></div>
+                            <div className="w-48 h-64 bg-white border-2 border-gray-300 shadow-xl relative flex flex-col p-4">
+                                <div className="w-full h-2 bg-gray-200 mb-2"></div>
+                                <div className="w-3/4 h-2 bg-gray-200 mb-2"></div>
+                                <div className="w-full h-2 bg-gray-200 mb-2"></div>
+                                <div className="w-1/2 h-2 bg-gray-200 mb-2"></div>
+                                <div className="mt-auto text-right text-red-500 font-bold text-xl transform -rotate-12">DENIED</div>
+                            </div>
+                        </div>
+                        <h2 className="text-4xl font-black text-gray-800 z-10 mt-12 uppercase italic">Filing Paperwork...</h2>
+                    </div>
+                );
+            case 'RECORD_CLIP':
+                return (
+                    <div className="w-full h-full bg-black flex flex-col items-center justify-center relative border-8 border-red-600">
+                        <div className="absolute top-10 right-10 flex items-center gap-2 animate-pulse">
+                            <div className="w-4 h-4 bg-red-500 rounded-full"></div>
+                            <span className="text-red-500 font-bold font-mono">REC</span>
+                        </div>
+                        <div className="w-64 h-48 border-4 border-white/20 relative flex items-center justify-center">
+                            <div className="absolute top-0 left-0 w-4 h-4 border-t-4 border-l-4 border-white"></div>
+                            <div className="absolute top-0 right-0 w-4 h-4 border-t-4 border-r-4 border-white"></div>
+                            <div className="absolute bottom-0 left-0 w-4 h-4 border-b-4 border-l-4 border-white"></div>
+                            <div className="absolute bottom-0 right-0 w-4 h-4 border-b-4 border-r-4 border-white"></div>
+                            <div className="text-6xl animate-bounce">🎺</div>
+                        </div>
+                        <h2 className="text-4xl font-black text-white z-10 mt-8 uppercase italic">Recording Clip...</h2>
+                    </div>
+                );
             default:
                 return (
                     <div className="w-full h-full bg-black flex items-center justify-center text-white">

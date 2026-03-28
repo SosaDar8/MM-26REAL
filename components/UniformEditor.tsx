@@ -14,9 +14,10 @@ interface UniformEditorProps {
     budget?: number; // Current school budget
     isCostEnabled?: boolean;
     customAssets?: CustomAsset[];
+    hasEquipManager?: boolean;
 }
 
-export const UniformEditor: React.FC<UniformEditorProps> = ({ uniforms: initialUniforms, activeIds: initialActiveIds, onSave, onBack, identity, budget = 0, isCostEnabled = true, customAssets = [] }) => {
+export const UniformEditor: React.FC<UniformEditorProps> = ({ uniforms: initialUniforms, activeIds: initialActiveIds, onSave, onBack, identity, budget = 0, isCostEnabled = true, customAssets = [], hasEquipManager = false }) => {
     const [uniforms, setUniforms] = useState<Uniform[]>(initialUniforms);
     const [activeIds, setActiveIds] = useState(initialActiveIds);
     const [editorMode, setEditorMode] = useState<'BAND' | 'DM' | 'MAJORETTE' | 'GUARD'>('BAND');
@@ -89,6 +90,7 @@ export const UniformEditor: React.FC<UniformEditorProps> = ({ uniforms: initialU
 
     // Initialize placement if not exists
     const [logoPlacement, setLogoPlacement] = useState<LogoPlacement>(activeUniform.logoPlacement || {
+        logoType: 'BAND',
         enabled: false,
         position: 'CHEST_LEFT',
         size: 'SMALL',
@@ -106,6 +108,7 @@ export const UniformEditor: React.FC<UniformEditorProps> = ({ uniforms: initialU
 
     useEffect(() => {
         setLogoPlacement(activeUniform.logoPlacement || {
+            logoType: 'BAND',
             enabled: false,
             position: 'CHEST_LEFT',
             size: 'SMALL',
@@ -221,7 +224,7 @@ export const UniformEditor: React.FC<UniformEditorProps> = ({ uniforms: initialU
         
         if (logoPlacement.enabled) cost += 100;
 
-        return cost;
+        return hasEquipManager ? Math.floor(cost * 0.8) : cost;
     };
 
     const currentCost = isCostEnabled ? calculateCost() : 0;
@@ -445,7 +448,35 @@ export const UniformEditor: React.FC<UniformEditorProps> = ({ uniforms: initialU
                     >
                         {uniforms.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
                     </select>
-                    <Button onClick={addNewUniform} className="w-full mt-2" variant="secondary">+ CREATE NEW</Button>
+                    <div className="flex gap-2 mt-2">
+                        <Button onClick={addNewUniform} className="flex-1" variant="secondary">+ CREATE NEW</Button>
+                        <Button 
+                            onClick={() => {
+                                const styles = ['classic', 'sash', 'vest', 'military', 'tracksuit'];
+                                const hats = ['shako', 'stetson', 'beret', 'cap'];
+                                const mainColor = COLORS[Math.floor(Math.random() * COLORS.length)].hex;
+                                const secondaryColor = COLORS[Math.floor(Math.random() * COLORS.length)].hex;
+                                const neutrals = ['#ffffff', '#000000', '#333333', '#e5e7eb'];
+                                const neutral = neutrals[Math.floor(Math.random() * neutrals.length)];
+                                
+                                updateUniform({
+                                    jacketColor: mainColor,
+                                    pantsColor: Math.random() > 0.5 ? mainColor : neutral,
+                                    hatColor: mainColor,
+                                    plumeColor: secondaryColor,
+                                    accentColor: secondaryColor,
+                                    jacketStyle: styles[Math.floor(Math.random() * styles.length)] as any,
+                                    hatStyle: hats[Math.floor(Math.random() * hats.length)] as any,
+                                    hasGauntlets: Math.random() > 0.5,
+                                    hasCape: Math.random() > 0.8,
+                                    hasSpats: Math.random() > 0.5
+                                });
+                            }} 
+                            className="flex-1 bg-purple-600 hover:bg-purple-500 border-purple-400"
+                        >
+                            🎲 RANDOMIZE
+                        </Button>
+                    </div>
                 </div>
 
                 <div className="space-y-6 flex-grow">
@@ -515,6 +546,19 @@ export const UniformEditor: React.FC<UniformEditorProps> = ({ uniforms: initialU
                             <span className="text-sm">Enable Logo</span>
                             <input type="checkbox" checked={!!logoPlacement.enabled} onChange={(e) => updateLogo({ enabled: e.target.checked })} className="accent-purple-500" />
                         </div>
+                        {logoPlacement.enabled && (
+                            <div className="flex gap-1 mt-1">
+                                {['NONE', 'SCHOOL', 'BAND', 'CUSTOM'].map(type => (
+                                    <button 
+                                        key={type}
+                                        onClick={() => updateLogo({ logoType: type as any })}
+                                        className={`flex-1 py-1 text-[9px] font-bold border ${logoPlacement.logoType === type ? 'bg-purple-600 text-white border-white' : 'bg-gray-800 text-gray-500 border-gray-600'}`}
+                                    >
+                                        {type}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
                         {(logoPlacement.enabled || logoPlacement.customText) && (
                                 <select 
                                     className="w-full bg-black border border-gray-600 text-xs p-1 mt-1"
@@ -524,6 +568,8 @@ export const UniformEditor: React.FC<UniformEditorProps> = ({ uniforms: initialU
                                     <option value="CHEST_LEFT">Chest Left</option>
                                     <option value="CHEST_CENTER">Chest Center</option>
                                     <option value="BACK">Back</option>
+                                    <option value="CAPE">Cape</option>
+                                    <option value="CHESTPLATE">Chestplate</option>
                                 </select>
                         )}
                         {logoPlacement.enabled && (
@@ -535,6 +581,14 @@ export const UniformEditor: React.FC<UniformEditorProps> = ({ uniforms: initialU
                                 <div>
                                     <label className="text-[9px] text-gray-500 block">Logo Y</label>
                                     <input type="range" min="-50" max="50" value={logoPlacement.logoYOffset || 0} onChange={(e) => updateLogo({ logoYOffset: parseInt(e.target.value) })} className="w-full h-1 bg-gray-600" />
+                                </div>
+                                <div>
+                                    <label className="text-[9px] text-gray-500 block">Logo X Scale</label>
+                                    <input type="range" min="0.1" max="2.0" step="0.1" value={logoPlacement.logoXScale || 1} onChange={(e) => updateLogo({ logoXScale: parseFloat(e.target.value) })} className="w-full h-1 bg-gray-600" />
+                                </div>
+                                <div>
+                                    <label className="text-[9px] text-gray-500 block">Logo Y Scale</label>
+                                    <input type="range" min="0.1" max="2.0" step="0.1" value={logoPlacement.logoYScale || 1} onChange={(e) => updateLogo({ logoYScale: parseFloat(e.target.value) })} className="w-full h-1 bg-gray-600" />
                                 </div>
                             </div>
                         )}
@@ -823,7 +877,9 @@ export const UniformEditor: React.FC<UniformEditorProps> = ({ uniforms: initialU
                         appearance={{ skinColor: '#8d5524', hairColor: '#000000', hairStyle: 1, bodyType: 'average', accessoryId: 0 }}
                         scale={2.0}
                         showInstrument={editorMode !== 'BAND'} // Show instrument for DM/Majorette/Guard to see it better
-                        logoGrid={identity?.logo}
+                        logoGrid={identity?.bandLogo}
+                        logoText={identity?.bandLogoText}
+                        bandIdentity={identity}
                         view={view}
                         noBounce={true}
                     />
@@ -838,7 +894,10 @@ export const UniformEditor: React.FC<UniformEditorProps> = ({ uniforms: initialU
                     {isCostEnabled && (
                         <div className="bg-black/80 border-2 border-white p-2 text-right mr-4">
                             <div className="text-xs text-gray-400 font-bold">ESTIMATED COST</div>
-                            <div className={`text-2xl font-black ${canAfford ? 'text-green-400' : 'text-red-500'}`}>${currentCost.toLocaleString()}</div>
+                            <div className={`text-2xl font-black ${canAfford ? 'text-green-400' : 'text-red-500'}`}>
+                                {hasEquipManager && <span className="text-sm line-through text-gray-500 mr-2">${Math.floor(currentCost / 0.8).toLocaleString()}</span>}
+                                ${currentCost.toLocaleString()}
+                            </div>
                             <div className="text-[10px] text-gray-500">BUDGET: ${budget.toLocaleString()}</div>
                         </div>
                     )}

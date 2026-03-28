@@ -1,12 +1,16 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from './Button';
+import { ProfileMenu } from './ProfileMenu';
 import { Settings, GameState } from '../types';
 import { soundManager } from '../services/soundManager';
 import { GAME_NAME, COLORS, GAME_VERSION, SPLASH_TEXTS } from '../constants';
+import { auth, onAuthStateChanged } from '../firebase';
+
+const CREATOR_EMAIL = 'andrewdann79@gmail.com';
 
 interface TitleScreenProps {
-    onStart: (mode: 'DIRECTOR' | 'CAREER') => void;
+    onStart: (mode: 'DIRECTOR' | 'CAREER' | 'COMMUNITY_HUB') => void;
     onLoad: (state: GameState) => void;
     hasSave: boolean;
     currentSettings: Settings;
@@ -16,10 +20,33 @@ interface TitleScreenProps {
 
 export const TitleScreen: React.FC<TitleScreenProps> = ({ onStart, onLoad, hasSave, currentSettings, onSettingsChange, onCredits }) => {
     const [showLoadMenu, setShowLoadMenu] = useState(false);
+    const [hasAutoSave, setHasAutoSave] = useState(false);
     const [showSettings, setShowSettings] = useState(false);
+    const [showProfile, setShowProfile] = useState(false);
+    const [showBugReport, setShowBugReport] = useState(false);
+    const [bugDescription, setBugDescription] = useState("");
+    const [bugReported, setBugReported] = useState(false);
     const [showWipeConfirm, setShowWipeConfirm] = useState(false);
     const [saveSlots, setSaveSlots] = useState<{id: number, empty: boolean, date?: string, name?: string, mode?: string}[]>([]);
     const [splashText, setSplashText] = useState("");
+    const [unreadCount, setUnreadCount] = useState(0);
+
+    useEffect(() => {
+        setHasAutoSave(!!localStorage.getItem('MF_GAME_STATE'));
+        
+        // Check for unread messages
+        try {
+            const savedData = localStorage.getItem('MF_GAME_STATE');
+            if (savedData) {
+                const parsed = JSON.parse(savedData);
+                const inbox = parsed.inbox || [];
+                const unread = inbox.filter((m: any) => !m.read).length;
+                setUnreadCount(unread);
+            }
+        } catch (e) {
+            console.error("Error checking unread messages:", e);
+        }
+    }, [showLoadMenu, showProfile]);
     
     // Easter Egg & Secret States
     const [careerUnlocked, setCareerUnlocked] = useState(false);
@@ -30,11 +57,18 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({ onStart, onLoad, hasSa
     const [bgIndex, setBgIndex] = useState(0);
     const [fieldPalette, setFieldPalette] = useState([COLORS[0].hex, COLORS[7].hex]); // Default Red/White
 
+    // Auth State
+    const [user, setUser] = useState<any>(null);
+
     // Konami Code Buffer
     const inputBuffer = useRef<string[]>([]);
     const KONAMI_CODE = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a'];
 
     useEffect(() => {
+        const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+            setUser(currentUser);
+        });
+
         setSplashText(SPLASH_TEXTS[Math.floor(Math.random() * SPLASH_TEXTS.length)]);
         // Init Sound (User interaction required usually, but we prepare)
         // Check local storage for unlock
@@ -69,6 +103,7 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({ onStart, onLoad, hasSa
         return () => {
             clearInterval(bgInterval);
             window.removeEventListener('keydown', handleKeyDown);
+            unsubscribe();
         };
     }, []);
 
@@ -226,6 +261,58 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({ onStart, onLoad, hasSa
             {/* Main Content Layer */}
             <div className="absolute inset-0 z-30 flex flex-col">
                 
+                {/* Floating Profile Button */}
+                <div className="absolute top-6 left-6 z-50 animate-fade-in-down">
+                    {hasAutoSave && (
+                        <button 
+                            onClick={() => handleLoad(0)} 
+                            className="bg-yellow-600/90 border-2 border-yellow-400 text-white font-bold py-3 px-5 rounded-full flex items-center gap-2 backdrop-blur-sm hover:bg-yellow-500 hover:scale-105 transition-all shadow-lg shadow-yellow-900/50 animate-pulse"
+                            title="Continue Session"
+                        >
+                            <span>▶</span>
+                            <span>CONTINUE</span>
+                        </button>
+                    )}
+                </div>
+                <div className="absolute top-6 right-6 z-50 animate-fade-in-down flex items-center gap-3">
+                    {user && (
+                        <div className="bg-slate-900/80 border border-slate-700 px-3 py-1 rounded-full flex items-center gap-2 backdrop-blur-sm">
+                            <span className="text-white font-bold text-sm tracking-wider">{user.displayName || 'Marcher'}</span>
+                            {user.email?.toLowerCase() === CREATOR_EMAIL.toLowerCase() && (
+                                <span className="text-yellow-400 text-sm" title="Creator">👑</span>
+                            )}
+                        </div>
+                    )}
+                    <button 
+                        onClick={() => setShowProfile(true)} 
+                        className={`relative w-14 h-14 bg-slate-900 border-2 ${user?.email?.toLowerCase() === CREATOR_EMAIL.toLowerCase() ? 'border-yellow-500 shadow-[0_0_15px_rgba(250,204,21,0.5)]' : 'border-slate-700'} rounded-full flex items-center justify-center text-2xl hover:bg-slate-800 hover:border-yellow-400 hover:shadow-[0_0_15px_rgba(250,204,21,0.5)] transition-all shadow-lg group overflow-hidden`}
+                        title="Profile & Cloud"
+                    >
+                        {user?.photoURL ? (
+                            <img src={user.photoURL} alt="Profile" className="w-full h-full object-cover group-hover:scale-110 transition-transform" referrerPolicy="no-referrer" />
+                        ) : (
+                            <span className="group-hover:scale-110 transition-transform">👤</span>
+                        )}
+                        {unreadCount > 0 && (
+                            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold w-5 h-5 flex items-center justify-center rounded-full border-2 border-slate-900 z-10 animate-pulse">
+                                {unreadCount > 9 ? '9+' : unreadCount}
+                            </span>
+                        )}
+                    </button>
+                </div>
+
+                {/* Floating Load Game Button */}
+                <div className="absolute left-0 top-1/2 -translate-y-1/2 z-40 animate-fade-in-right">
+                    <button 
+                        onClick={() => setShowLoadMenu(true)} 
+                        className="bg-slate-900 border-y-2 border-r-2 border-slate-700 hover:border-green-400 hover:bg-slate-800 text-white p-4 rounded-r-2xl shadow-[0_0_20px_rgba(0,0,0,0.8)] hover:shadow-[0_0_20px_rgba(74,222,128,0.4)] transition-all flex flex-col items-center gap-3 group"
+                        title="Load Game"
+                    >
+                        <span className="text-3xl group-hover:scale-110 transition-transform text-green-400 drop-shadow-md">💾</span>
+                        <span className="font-mono text-xs font-bold tracking-[0.3em] uppercase text-gray-300 group-hover:text-white transition-colors" style={{ writingMode: 'vertical-rl', textOrientation: 'upright' }}>LOAD</span>
+                    </button>
+                </div>
+
                 {/* Load Menu Overlay */}
                 {showLoadMenu && (
                     <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-8">
@@ -301,17 +388,6 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({ onStart, onLoad, hasSa
                         </div>
 
                         <div className="group relative">
-                            <div className="absolute -inset-1 bg-gradient-to-r from-green-600 to-emerald-500 rounded blur opacity-25 group-hover:opacity-100 transition duration-1000 group-hover:duration-200"></div>
-                            <button 
-                                onClick={() => setShowLoadMenu(true)} 
-                                className="relative w-full bg-slate-900 border border-slate-700 hover:bg-slate-800 text-white font-bold py-4 px-6 uppercase tracking-widest text-sm transition-all transform hover:scale-[1.02] flex justify-between items-center"
-                            >
-                                <span>Load Game</span>
-                                <span className="text-green-400">💾</span>
-                            </button>
-                        </div>
-
-                        <div className="group relative">
                             {careerUnlocked ? (
                                 <>
                                     <div className="absolute -inset-1 bg-gradient-to-r from-purple-600 to-pink-500 rounded blur opacity-25 group-hover:opacity-100 transition duration-1000 group-hover:duration-200"></div>
@@ -333,6 +409,17 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({ onStart, onLoad, hasSa
                                 </button>
                             )}
                         </div>
+
+                        <div className="group relative mt-4">
+                            <div className="absolute -inset-1 bg-gradient-to-r from-green-600 to-emerald-500 rounded blur opacity-25 group-hover:opacity-100 transition duration-1000 group-hover:duration-200"></div>
+                            <button 
+                                onClick={() => onStart('COMMUNITY_HUB')} 
+                                className="relative w-full bg-slate-900 border border-slate-700 hover:bg-slate-800 text-white font-bold py-4 px-6 uppercase tracking-widest text-sm transition-all transform hover:scale-[1.02] flex justify-between items-center"
+                            >
+                                <span>Community Hub</span>
+                                <span className="text-green-400">🌍</span>
+                            </button>
+                        </div>
                     </div>
                 </div>
 
@@ -340,12 +427,60 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({ onStart, onLoad, hasSa
                 <div className="absolute bottom-0 w-full p-6 flex justify-between items-end text-xs font-mono text-gray-500 z-40">
                     <div className="flex gap-4">
                         <button className="hover:text-white transition-colors" onClick={() => setShowSettings(!showSettings)}>SETTINGS</button>
+                        <button className="hover:text-yellow-400 transition-colors" onClick={() => setShowBugReport(true)}>REPORT BUG</button>
                     </div>
                     <div className="text-right">
                         <span onClick={handleVersionClick} className="cursor-pointer hover:text-white transition-colors select-none">{GAME_VERSION}</span>
                     </div>
                 </div>
             </div>
+
+            {/* PROFILE MODAL */}
+            {showProfile && <ProfileMenu onClose={() => setShowProfile(false)} />}
+
+            {/* BUG REPORT MODAL */}
+            {showBugReport && (
+                <div className="absolute inset-0 z-50 bg-black/80 flex items-center justify-center p-8 backdrop-blur-sm animate-fade-in">
+                    <div className="bg-slate-800 border-4 border-yellow-500 p-8 max-w-md w-full shadow-2xl relative">
+                        <h2 className="text-2xl font-black text-yellow-500 mb-6 uppercase border-b-2 border-gray-600 pb-2">Report a Bug</h2>
+                        
+                        {bugReported ? (
+                            <div className="text-center py-8">
+                                <div className="text-4xl mb-4">✅</div>
+                                <h3 className="text-xl font-bold text-white mb-2">Bug Reported Successfully!</h3>
+                                <p className="text-gray-400 text-sm mb-6">Thank you for your feedback. We will look into it.</p>
+                                <Button onClick={() => { setShowBugReport(false); setBugReported(false); setBugDescription(""); }} className="w-full">CLOSE</Button>
+                            </div>
+                        ) : (
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="text-xs font-bold text-gray-400 uppercase mb-2 block">Describe the issue</label>
+                                    <textarea 
+                                        value={bugDescription}
+                                        onChange={(e) => setBugDescription(e.target.value)}
+                                        className="w-full h-32 bg-slate-900 border border-slate-600 text-white p-3 text-sm focus:border-yellow-500 outline-none resize-none"
+                                        placeholder="What happened? What did you expect to happen?"
+                                    />
+                                </div>
+                                <div className="flex gap-4 pt-4">
+                                    <Button onClick={() => setShowBugReport(false)} variant="secondary" className="flex-1">CANCEL</Button>
+                                    <Button 
+                                        onClick={() => {
+                                            if (bugDescription.trim()) {
+                                                setBugReported(true);
+                                            }
+                                        }} 
+                                        className="flex-1 bg-yellow-600 hover:bg-yellow-500 text-black border-yellow-400"
+                                        disabled={!bugDescription.trim()}
+                                    >
+                                        SUBMIT
+                                    </Button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
 
             {/* SETTINGS MODAL */}
             {showSettings && (

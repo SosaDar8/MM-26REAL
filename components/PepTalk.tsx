@@ -118,12 +118,13 @@ export const PepTalk: React.FC<PepTalkProps> = ({ director, opponentName, onComp
                                 uniform={{...displayUniform, hatStyle: 'cap', jacketColor: '#111'}} // Director outfit simulation
                                 appearance={director.appearance}
                                 showInstrument={false}
+                                bandIdentity={identity}
                             />
                          </div>
                          <div className="flex gap-2 opacity-80 transform scale-75 origin-bottom-left">
                              {/* Actual Band Members in Actual Uniforms */}
-                             <BandMemberVisual instrument={InstrumentType.SNARE} uniform={displayUniform} appearance={getRandomAppearance()} />
-                             <BandMemberVisual instrument={InstrumentType.TUBA} uniform={displayUniform} appearance={getRandomAppearance()} />
+                             <BandMemberVisual instrument={InstrumentType.SNARE} uniform={displayUniform} appearance={getRandomAppearance()} bandIdentity={identity} />
+                             <BandMemberVisual instrument={InstrumentType.TUBA} uniform={displayUniform} appearance={getRandomAppearance()} bandIdentity={identity} />
                          </div>
                     </div>
                 </div>

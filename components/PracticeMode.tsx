@@ -8,12 +8,36 @@ import { BandMemberVisual } from './BandMemberVisual';
 
 interface PracticeModeProps {
     onBack: () => void;
+    onComplete: (skillGain: number, energyCost: number, specificBonuses: { percussion: number, guard: number, brass: number }) => void;
     gameState: GameState;
 }
 
-export const PracticeMode: React.FC<PracticeModeProps> = ({ onBack, gameState }) => {
+export const PracticeMode: React.FC<PracticeModeProps> = ({ onBack, onComplete, gameState }) => {
     const [phase, setPhase] = useState<'ROOM_VIEW' | 'MONTAGE' | 'RESULTS'>('ROOM_VIEW');
     const [montageIndex, setMontageIndex] = useState(0);
+
+    // Calculate Staff Bonuses
+    const hasArranger = gameState.staff.some(s => s.role === 'Music Arranger');
+    const hasVisualTech = gameState.staff.some(s => s.role === 'Visual Tech');
+    const hasAssistant = gameState.staff.some(s => s.role === 'Assistant Director');
+    
+    const hasPercussionInst = gameState.staff.some(s => s.role === 'Percussion Instructor');
+    const hasGuardInst = gameState.staff.some(s => s.role === 'Guard Instructor');
+    const hasBrassHead = gameState.staff.some(s => s.role === 'Brass Caption Head');
+    
+    const baseSkillGain = 5;
+    const skillBonus = (hasArranger ? 2 : 0) + (hasVisualTech ? 2 : 0);
+    const totalSkillGain = baseSkillGain + skillBonus;
+    
+    const specificBonuses = {
+        percussion: hasPercussionInst ? 3 : 0,
+        guard: hasGuardInst ? 3 : 0,
+        brass: hasBrassHead ? 3 : 0
+    };
+    
+    const baseEnergyCost = 10;
+    const energyDiscount = hasAssistant ? 3 : 0;
+    const totalEnergyCost = baseEnergyCost - energyDiscount;
 
     const montageEvents = [
         { id: 'warmup', text: 'Sectionals: Tuning Up...', type: 'PRACTICE' as const, duration: 3000 },
@@ -73,7 +97,7 @@ export const PracticeMode: React.FC<PracticeModeProps> = ({ onBack, gameState })
                     ))}
 
                     {/* Band Members Hanging Out */}
-                    {gameState.members.slice(0, 10).map((member, i) => (
+                    {gameState.members.filter(m => m && m.id).slice(0, 10).map((member, i) => (
                         <div 
                             key={member.id}
                             className="absolute transition-all duration-1000 ease-in-out"
@@ -113,14 +137,16 @@ export const PracticeMode: React.FC<PracticeModeProps> = ({ onBack, gameState })
                     <div className="flex gap-4 justify-center">
                         <div className="bg-black p-4 border border-gray-700">
                             <div className="text-xs text-gray-500">SKILL</div>
-                            <div className="text-xl text-green-400">+5</div>
+                            <div className="text-xl text-green-400">+{totalSkillGain}</div>
+                            {skillBonus > 0 && <div className="text-[10px] text-yellow-400 mt-1">Staff Bonus!</div>}
                         </div>
                         <div className="bg-black p-4 border border-gray-700">
                             <div className="text-xs text-gray-500">ENERGY</div>
-                            <div className="text-xl text-red-400">-10</div>
+                            <div className="text-xl text-red-400">-{totalEnergyCost}</div>
+                            {energyDiscount > 0 && <div className="text-[10px] text-yellow-400 mt-1">Staff Savings!</div>}
                         </div>
                     </div>
-                    <Button onClick={onBack} className="mt-8 w-full">RETURN TO HUB</Button>
+                    <Button onClick={() => onComplete(totalSkillGain, totalEnergyCost, specificBonuses)} className="mt-8 w-full">RETURN TO HUB</Button>
                 </div>
             </div>
         );
